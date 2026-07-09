@@ -49,8 +49,8 @@ class GrillRequest(BaseModel):
     faces: List[List[int]] = Field(..., description="Mx3 triangle vertex indices")
     inner_clearance: float = Field(0.10, ge=0.0, le=2.0, description="Fit gap between tooth and grill interior (mm)")
     shell_thickness: float = Field(0.80, ge=0.10, le=5.0, description="Nominal metal wall thickness (mm)")
-    back_side_thinner_ratio: float = Field(0.45, ge=0.0, le=0.90, description="Max thickness reduction on lingual (-Y facing) surfaces")
-    smoothing_iterations: int = Field(4, ge=0, le=10, description="Laplacian smoothing passes on the outer shell")
+    back_side_thinner_ratio: float = Field(0.45, ge=0.0, le=0.90, description="Max thickness reduction on lingual (-Y facing) and biting surfaces")
+    smooth_iterations: int = Field(3, ge=0, le=10, description="Laplacian smoothing passes on the outer shell (0 = keep raw anatomical detail)")
 
 
 # --------------------------------------------------------------------------- #
@@ -139,9 +139,11 @@ def build_grill_shell(vertices: np.ndarray, faces: np.ndarray,
     # 1. Inner (tooth-facing) surface: clearance offset.
     inner = vertices + normals * inner_clearance
 
-    # 2. Dynamic back-side thinning: alignment with -Y in [0, 1].
-    backness = np.clip(-normals[:, 1], 0.0, 1.0)
-    thickness = shell_thickness * (1.0 - back_side_thinner_ratio * backness)
+    # 2. Dynamic thinning: lingual surfaces (normal aligned with -Y) get the
+    #    full reduction; biting surfaces (normal aligned with -Z) contribute
+    #    at 60% weight so the occlusal shell also stays comfortable.
+    directional = np.clip(np.maximum(-normals[:, 1], 0.6 * -normals[:, 2]), 0.0, 1.0)
+    thickness = shell_thickness * (1.0 - back_side_thinner_ratio * directional)
     outer = inner + normals * thickness[:, None]
 
     # 3. Smooth the outer shell only; rim (boundary) vertices stay pinned.
@@ -196,7 +198,7 @@ def generate_grill(request: GrillRequest) -> Response:
             inner_clearance=request.inner_clearance,
             shell_thickness=request.shell_thickness,
             back_side_thinner_ratio=request.back_side_thinner_ratio,
-            smoothing_iterations=request.smoothing_iterations,
+            smoothing_iterations=request.smooth_iterations,
         )
     except HTTPException:
         raise

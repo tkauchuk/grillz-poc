@@ -22,8 +22,11 @@
   .tool-active { background: #fbbf24 !important; color: #0a0c10 !important; }
   input[type=range] { -webkit-appearance: none; height: 4px; border-radius: 2px; background: #2b3140; width: 100%; }
   input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fbbf24; cursor: pointer; box-shadow: 0 0 6px rgba(251,191,36,.6); }
-  .measure-label { position: absolute; transform: translate(-50%, -130%); background: rgba(10,12,16,.85); color: #fbbf24; font: 600 11px/1 ui-monospace, monospace; padding: 4px 7px; border-radius: 5px; border: 1px solid #3a4155; pointer-events: none; white-space: nowrap; }
+  .measure-label { position: absolute; transform: translate(-50%, -140%); background: rgba(6,20,10,.9); color: #39ff14; font: 700 12px/1 ui-monospace, monospace; padding: 4px 8px; border-radius: 5px; border: 1px solid #1f6b2d; pointer-events: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
   .panel-title { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #6b7488; font-weight: 700; }
+  .metal-swatch { width: 44px; height: 44px; border-radius: 9999px; cursor: pointer; transition: transform .12s ease; border: 2px solid transparent; box-shadow: 0 3px 10px rgba(0,0,0,.5), inset 0 -4px 8px rgba(0,0,0,.35), inset 0 4px 8px rgba(255,255,255,.35); }
+  .metal-swatch:hover { transform: scale(1.1); }
+  .metal-swatch.metal-active { border-color: #fbbf24; box-shadow: 0 0 0 3px rgba(251,191,36,.35), 0 3px 10px rgba(0,0,0,.5), inset 0 -4px 8px rgba(0,0,0,.35), inset 0 4px 8px rgba(255,255,255,.35); }
 </style>
 </head>
 <body class="text-slate-300 select-none">
@@ -35,10 +38,10 @@
     <div class="flex items-center gap-2">
       <span class="text-xl">💎</span>
       <h1 class="font-black tracking-widest text-sm text-slate-100">GRILLZ<span class="text-amber-400">CAD</span></h1>
-      <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#232a38] text-slate-400">POC</span>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#232a38] text-slate-400">v2</span>
     </div>
     <div class="flex-1"></div>
-    <span id="status" class="text-xs text-slate-500 truncate max-w-[40ch]">Paint teeth, then generate.</span>
+    <span id="status" class="text-xs text-slate-500 truncate max-w-[42ch]">Paint teeth with the brush, then generate.</span>
     <button id="btnGenerate"
       class="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-600 text-black text-xs font-extrabold tracking-wide hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-900/40">
       ⚡ GENERATE GRILLZ
@@ -65,9 +68,9 @@
           <button id="toolOrbit"   class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition tool-active">🖐 Orbit / Inspect</button>
           <button id="toolPaint"   class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">🖌 Paint Teeth</button>
           <button id="toolErase"   class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">🧽 Erase Paint</button>
-          <button id="toolMeasure" class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">📏 Measure (mm)</button>
+          <button id="toolMeasure" class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">📏 Ruler (mm)</button>
         </div>
-        <button id="btnClearMeasure" class="mt-1.5 w-full text-[10px] px-2 py-1 rounded bg-[#161b26] text-slate-500 hover:text-slate-300 transition">clear measurements</button>
+        <button id="btnClearMeasure" class="mt-1.5 w-full text-[10px] px-2 py-1 rounded bg-[#161b26] text-slate-500 hover:text-slate-300 transition">Clear measurements</button>
       </div>
 
       <div>
@@ -77,7 +80,7 @@
           <input id="stlUpload" type="file" accept=".stl" class="hidden">
         </label>
         <button id="btnResetArch" class="mt-1.5 w-full text-[10px] px-2 py-1 rounded bg-[#161b26] text-slate-500 hover:text-slate-300 transition">reset to demo arch</button>
-        <p class="mt-1 text-[10px] text-slate-600 leading-snug">No file? A procedural dental arch is generated so the app works instantly.</p>
+        <p class="mt-1 text-[10px] text-slate-600 leading-snug">No file? A realistic procedural dental arch is generated so the app works instantly.</p>
       </div>
 
       <div class="mt-auto rounded-lg bg-[#161b26] p-3">
@@ -130,10 +133,15 @@
           <div>
             <div class="flex justify-between text-xs mb-2"><span>Back-Side Thinning</span><span class="text-amber-400 font-mono" id="valBackThin">45 %</span></div>
             <input type="range" id="sldBackThin" min="0" max="90" step="5" value="45">
-            <p class="text-[10px] text-slate-600 mt-1.5 leading-snug">Lingual (tongue-side) walls are dynamically thinned by up to this ratio for bite comfort.</p>
+            <p class="text-[10px] text-slate-600 mt-1.5 leading-snug">Lingual and biting surfaces are dynamically thinned by up to this ratio for comfort and material saving.</p>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Smooth Strength</span><span class="text-amber-400 font-mono" id="valSmooth">3</span></div>
+            <input type="range" id="sldSmooth" min="0" max="10" step="1" value="3">
+            <p class="text-[10px] text-slate-600 mt-1.5 leading-snug">Laplacian polish iterations on the outer shell. <span class="text-slate-400">0</span> keeps every cusp and ridge of the tooth anatomy; <span class="text-slate-400">10</span> melts the shell into a soft jewelry blob.</p>
           </div>
           <div class="rounded-lg bg-[#161b26] p-3 text-[11px] leading-relaxed text-slate-500">
-            The backend offsets the painted surface by the clearance, extrudes a variable-thickness outer shell, Laplacian-polishes it, then stitches the rims into a <span class="text-slate-300">watertight manifold</span> ready for casting.
+            The backend offsets the painted surface by the clearance, extrudes a variable-thickness outer shell, polishes it, then stitches the rims into a <span class="text-slate-300">watertight manifold</span> ready for casting.
           </div>
         </section>
 
@@ -181,23 +189,6 @@
 
         <!-- ---- TAB: EXPORT ---- -->
         <section id="tab-export" class="tab-panel hidden space-y-6">
-          <div>
-            <p class="panel-title mb-2">Metal Finish (PBR)</p>
-            <div class="grid grid-cols-3 gap-2">
-              <button data-metal="gold" class="metal-btn rounded-lg p-2 bg-[#1c2333] hover:bg-[#273044] transition ring-2 ring-amber-400">
-                <div class="h-9 rounded-md" style="background:radial-gradient(circle at 35% 30%, #ffe9a8, #d4af37 55%, #8a6d1d)"></div>
-                <p class="text-[10px] mt-1.5 font-bold">Gold</p>
-              </button>
-              <button data-metal="rose" class="metal-btn rounded-lg p-2 bg-[#1c2333] hover:bg-[#273044] transition ring-2 ring-transparent">
-                <div class="h-9 rounded-md" style="background:radial-gradient(circle at 35% 30%, #ffd9c9, #e0937a 55%, #93513c)"></div>
-                <p class="text-[10px] mt-1.5 font-bold">Rose Gold</p>
-              </button>
-              <button data-metal="silver" class="metal-btn rounded-lg p-2 bg-[#1c2333] hover:bg-[#273044] transition ring-2 ring-transparent">
-                <div class="h-9 rounded-md" style="background:radial-gradient(circle at 35% 30%, #ffffff, #c9cdd4 55%, #7b8087)"></div>
-                <p class="text-[10px] mt-1.5 font-bold">Silver</p>
-              </button>
-            </div>
-          </div>
           <div class="space-y-2">
             <button id="btnDownloadGrill" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-600 text-black text-xs font-extrabold tracking-wide hover:brightness-110 transition disabled:opacity-30 disabled:cursor-not-allowed" disabled>
               ⬇ Download Grill STL (watertight)
@@ -210,6 +201,26 @@
             The grill STL comes straight from the backend as a <span class="text-slate-300">binary, watertight manifold</span> — send it to a caster or resin printer as-is.
           </div>
         </section>
+      </div>
+
+      <!-- ---- MATERIAL PREVIEW (always visible) ---- -->
+      <div class="shrink-0 p-4 border-t border-[#232a38] bg-[#0d1017]">
+        <p class="panel-title mb-3">Material Preview</p>
+        <div class="flex items-center gap-4">
+          <button data-metal="gold" title="Yellow Gold"
+            class="metal-swatch metal-active"
+            style="background: radial-gradient(circle at 32% 28%, #fff3b0, #ffd700 48%, #a8860b 92%)"></button>
+          <button data-metal="rose" title="Rose Gold"
+            class="metal-swatch"
+            style="background: radial-gradient(circle at 32% 28%, #f3c9c9, #b76e79 52%, #6e3b44 92%)"></button>
+          <button data-metal="silver" title="Polished Silver"
+            class="metal-swatch"
+            style="background: radial-gradient(circle at 32% 28%, #ffffff, #e3e4e5 48%, #83878c 92%)"></button>
+          <div class="ml-1">
+            <p id="metalName" class="text-xs font-bold text-slate-100">Yellow Gold</p>
+            <p id="metalSpec" class="text-[10px] text-slate-500 font-mono">#ffd700 · rough 0.15</p>
+          </div>
+        </div>
       </div>
     </aside>
   </div>
@@ -226,7 +237,8 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 
 /* ============================ Scene setup ============================ */
 /* Units are millimetres. Dental convention used throughout:
-   +Y = labial (front of the smile), -Y = lingual (back), +Z = up. */
+   +Y = labial (front of the smile), -Y = lingual (back),
+   +Z = toward the gums, -Z = incisal / biting edge.                    */
 
 const viewport = document.getElementById('viewport');
 const canvas   = document.getElementById('canvas3d');
@@ -241,7 +253,7 @@ scene.background = new THREE.Color(0x0b0e13);
 
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
 camera.up.set(0, 0, 1);
-camera.position.set(0, 95, 28);
+camera.position.set(0, 95, 24);
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -251,99 +263,215 @@ controls.target.set(0, 5, 0);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-const key = new THREE.DirectionalLight(0xffffff, 1.4);
-key.position.set(30, 80, 60);
-scene.add(key, new THREE.DirectionalLight(0x8899ff, 0.4).translateY(-80), new THREE.AmbientLight(0xffffff, 0.25));
+/* Warm three-point studio setup so the metals throw rich reflections. */
+const keyLight = new THREE.DirectionalLight(0xffe0b8, 1.9);
+keyLight.position.set(35, 90, 70);
+const fillLight = new THREE.DirectionalLight(0xbcd0ff, 0.5);
+fillLight.position.set(-70, -20, 30);
+const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.9);
+rimLight.position.set(-10, -90, 55);
+scene.add(keyLight, fillLight, rimLight, new THREE.AmbientLight(0xfff4e0, 0.22));
 
 const grid = new THREE.GridHelper(220, 22, 0x232a38, 0x161b26);
-grid.rotation.x = Math.PI / 2;   // lie in the XY plane
+grid.rotation.x = Math.PI / 2;            // lie in the XY plane
 grid.position.z = -16;
 scene.add(grid);
 
 /* ============================ Materials ============================ */
 
 const METALS = {
-  gold:   new THREE.MeshStandardMaterial({ color: 0xffc94d, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.6 }),
-  rose:   new THREE.MeshStandardMaterial({ color: 0xe8a17a, metalness: 1.0, roughness: 0.14, envMapIntensity: 1.6 }),
-  silver: new THREE.MeshStandardMaterial({ color: 0xf4f4f0, metalness: 1.0, roughness: 0.10, envMapIntensity: 1.6 }),
+  gold:   { name: 'Yellow Gold',     spec: '#ffd700 · rough 0.15',
+            mat: new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 1.0, roughness: 0.15, envMapIntensity: 1.5 }) },
+  rose:   { name: 'Rose Gold',       spec: '#b76e79 · rough 0.18',
+            mat: new THREE.MeshStandardMaterial({ color: 0xb76e79, metalness: 1.0, roughness: 0.18, envMapIntensity: 1.5 }) },
+  silver: { name: 'Polished Silver', spec: '#e3e4e5 · rough 0.12',
+            mat: new THREE.MeshStandardMaterial({ color: 0xe3e4e5, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.5 }) },
 };
 let currentMetal = 'gold';
 
-const enamelMaterial = new THREE.MeshStandardMaterial({ color: 0xf1ead9, metalness: 0.02, roughness: 0.32, envMapIntensity: 0.8 });
-const paintedMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffd83d, emissive: 0x8a6a00, metalness: 0.1, roughness: 0.4,
-  transparent: true, opacity: 0.62, depthWrite: true,
+const ENAMEL_COLOR = new THREE.Color(0xf3ecd9);
+const PAINT_COLOR  = new THREE.Color(0xffd83d);
+const enamelMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff, vertexColors: true,
+  metalness: 0.02, roughness: 0.30, envMapIntensity: 0.8,
 });
 const gemMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.35, roughness: 0.04, envMapIntensity: 2.4 });
 
-/* ====================== Procedural dental arch ====================== */
-/* Anatomy-ish tooth widths in mm, central incisors -> first molars.    */
+/* ================== Realistic procedural dental arch ================== */
+/* Each tooth is a deformed superellipsoid:
+     - incisors  : flat trapezoids, thin incisal edge, wider at the edge
+     - canines   : pointed diamond cross-section tapering to a tip
+     - premolars : blocky, two cusps (buccal + lingual)
+     - molars    : wide blocks with four corner cusps
+   All teeth are BAKED IN WORLD SPACE and merged into ONE mesh, so the
+   paint brush sweeps seamlessly across the arch. Per-tooth bookkeeping
+   (vertex/face ranges) drives selection tinting and shell extraction.  */
 
-const TOOTH_SPECS = [                    // [width, depth, height]
-  [8.5, 7.0, 10.5], [6.6, 6.5, 9.5],     // incisors
-  [7.6, 7.8, 10.0],                      // canine
-  [7.0, 8.5, 8.5],  [6.8, 9.0, 8.0],     // premolars
-  [10.2, 10.5, 7.5],                     // molar
+const sc = (a, e) => Math.sign(a) * Math.abs(a) ** e;
+
+const PROFILES = {
+  incisor: {   // trapezoidal: thin biting edge, squarish silhouette
+    e1: 0.55, e2: 0.42,
+    taper: g => ({ x: 1 - 0.24 * g, y: 0.40 + 0.60 * g }),
+  },
+  canine: {    // diamond cross-section narrowing to a point
+    e1: 0.60, e2: 1.10,
+    taper: g => { const s = 0.32 + 0.68 * g; return { x: s, y: 0.15 + 0.85 * s }; },
+  },
+  premolar: {  // blocky with buccal + lingual cusps
+    e1: 0.50, e2: 0.34, cusps: 2, cuspAmp: 0.11,
+    taper: g => ({ x: 0.90 + 0.10 * g, y: 0.90 + 0.10 * g }),
+  },
+  molar: {     // widest, four corner cusps
+    e1: 0.48, e2: 0.30, cusps: 4, cuspAmp: 0.09,
+    taper: g => ({ x: 0.92 + 0.08 * g, y: 0.92 + 0.08 * g }),
+  },
+};
+
+const TOOTH_ROW = [                          // per half-arch, midline outward
+  { type: 'incisor',  w: 8.5,  d: 7.0,  h: 10.5 },   // central incisor
+  { type: 'incisor',  w: 6.6,  d: 6.4,  h: 9.8  },   // lateral incisor
+  { type: 'canine',   w: 7.6,  d: 7.8,  h: 10.6 },   // canine
+  { type: 'premolar', w: 7.0,  d: 8.4,  h: 8.6  },   // 1st premolar
+  { type: 'premolar', w: 6.8,  d: 8.8,  h: 8.2  },   // 2nd premolar
+  { type: 'molar',    w: 10.2, d: 10.8, h: 7.6  },   // 1st molar
 ];
-const ARCH_A = 27, ARCH_B = 31;          // ellipse semi-axes (x, y)
+const ARCH_A = 27, ARCH_B = 31;              // arch ellipse semi-axes (x, y)
+const OCCLUSAL_Z = -5.2;                     // biting edges aligned to this plane
 
-let teeth = [];                          // Mesh[] — paintable targets
-let teethGroup = null;
-const selected = new Set();              // tooth meshes currently painted
-
-function makeToothGeometry(w, d, h) {
-  const g = new THREE.SphereGeometry(0.5, 22, 18);
-  const pos = g.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {   // square the crown a little
-    v.fromBufferAttribute(pos, i);
-    const squish = 1 + 0.16 * (1 - Math.abs(v.z * 2) ** 3);
-    pos.setXYZ(i, v.x * squish, v.y * squish, v.z);
+function dropDegenerateTriangles(geometry) {
+  const pos = geometry.attributes.position, index = geometry.index;
+  const kept = [];
+  const pa = new THREE.Vector3(), pb = new THREE.Vector3(), pc = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3();
+  for (let t = 0; t < index.count / 3; t++) {
+    const a = index.getX(t * 3), b = index.getX(t * 3 + 1), c = index.getX(t * 3 + 2);
+    if (a === b || b === c || a === c) continue;
+    pa.fromBufferAttribute(pos, a); pb.fromBufferAttribute(pos, b); pc.fromBufferAttribute(pos, c);
+    ab.subVectors(pb, pa); ac.subVectors(pc, pa);
+    if (ab.cross(ac).lengthSq() < 1e-10) continue;
+    kept.push(a, b, c);
   }
-  g.scale(w, d, h);
-  g.computeVertexNormals();
-  return g;
+  geometry.setIndex(kept);
+  return geometry;
 }
+
+function makeToothGeometry(type, w, d, h) {
+  const P = PROFILES[type];
+  const U = 26, V = 16;
+  const rx = w / 2, ry = d / 2, rz = h / 2;
+  const positions = [];
+  for (let iv = 0; iv <= V; iv++) {
+    const v = -Math.PI / 2 + Math.PI * iv / V;
+    for (let iu = 0; iu <= U; iu++) {
+      const u = -Math.PI + 2 * Math.PI * iu / U;
+      let x = rx * sc(Math.cos(v), P.e1) * sc(Math.cos(u), P.e2);
+      let y = ry * sc(Math.cos(v), P.e1) * sc(Math.sin(u), P.e2);
+      let z = rz * sc(Math.sin(v), P.e1);
+      const zn = z / rz;                     // -1 = incisal edge, +1 = gum
+      const g = (zn + 1) / 2;
+      const t = P.taper(g);
+      x *= t.x; y *= t.y;
+      if (P.cusps) {                         // sculpt occlusal cusps + grooves
+        const f = Math.sin((P.cusps === 2 ? 1 : 2) * u) ** 2;
+        const wgt = THREE.MathUtils.smoothstep(-zn, 0.35, 0.9);
+        z -= P.cuspAmp * h * f * wgt;        // cusp tips extend down
+        z += P.cuspAmp * h * 0.45 * wgt;     // grooves recess between them
+      }
+      positions.push(x, y, z);
+    }
+  }
+  const indices = [];
+  for (let iv = 0; iv < V; iv++) {
+    for (let iu = 0; iu < U; iu++) {
+      const a = iv * (U + 1) + iu, b = a + 1, c = a + U + 1, e = c + 1;
+      indices.push(a, c, b, b, c, e);
+    }
+  }
+  let geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry = BufferGeometryUtils.mergeVertices(geometry, 1e-3);
+  dropDegenerateTriangles(geometry);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+let modelMesh = null;                        // single merged mesh (arch or uploaded scan)
+let toothInfo = [];                          // per tooth: ranges + placement metadata
+let faceToTooth = null;                      // faceIndex -> tooth id (null = whole mesh is tooth 0)
+const selected = new Set();                  // painted tooth ids
 
 function buildProceduralArch() {
   clearModel();
-  teethGroup = new THREE.Group();
-  teethGroup.name = 'arch';
-  let index = 0;
+  const geometries = [];
+  toothInfo = [];
+  let id = 0;
 
   for (const side of [1, -1]) {
-    let t = side * 0.055;                 // small gap at the midline
-    for (let i = 0; i < TOOTH_SPECS.length; i++) {
-      const [w, d, h] = TOOTH_SPECS[i];
-      // walk the ellipse by (approximate) arc length so teeth touch nicely
+    let t = side * 0.055;                    // small gap at the midline
+    for (let i = 0; i < TOOTH_ROW.length; i++) {
+      const { type, w, d, h } = TOOTH_ROW[i];
+      // walk the arch ellipse by approximate arc length so teeth touch
       const r = Math.hypot(ARCH_A * Math.sin(t), ARCH_B * Math.cos(t));
       const dt = side * (w * 0.60) / r;
       if (i > 0) t += dt;
       const x = ARCH_A * Math.sin(t);
       const y = ARCH_B * Math.cos(t);
       const n = new THREE.Vector3(x / (ARCH_A * ARCH_A), y / (ARCH_B * ARCH_B), 0).normalize();
+      const centerZ = h / 2 + OCCLUSAL_Z;    // align biting edges on one plane
 
-      const mesh = new THREE.Mesh(makeToothGeometry(w, d, h), enamelMaterial.clone());
-      mesh.position.set(x + n.x * d * 0.1, y + n.y * d * 0.1, 0);
-      mesh.rotation.z = Math.atan2(-n.x, n.y);       // local +Y faces outward
-      mesh.userData = { isTooth: true, index: index++, dims: { w, d, h } };
-      teethGroup.add(mesh);
-      teeth.push(mesh);
-      t += dt;                                        // advance past this tooth
+      const geometry = makeToothGeometry(type, w, d, h);
+      const m = new THREE.Matrix4()
+        .makeRotationZ(Math.atan2(-n.x, n.y))       // local +Y faces outward
+        .setPosition(x + n.x * d * 0.08, y + n.y * d * 0.08, centerZ);
+      geometry.applyMatrix4(m);                     // bake world space
+
+      toothInfo.push({
+        id, type,
+        center: new THREE.Vector3(x, y, centerZ),
+        outward: n.clone(),
+        dims: { w, d, h },
+        zTop: centerZ + h / 2, zBottom: centerZ - h / 2,
+      });
+      geometries.push(geometry);
+      id++;
+      t += dt;                                      // advance past this tooth
     }
   }
-  scene.add(teethGroup);
+
+  // record ranges, give every tooth an enamel-tinted color attribute, merge
+  let vOff = 0, fOff = 0;
+  geometries.forEach((g, k) => {
+    const nv = g.attributes.position.count;
+    const nf = g.index.count / 3;
+    const colors = new Float32Array(nv * 3);
+    for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    Object.assign(toothInfo[k], { vStart: vOff, vCount: nv, fStart: fOff, fCount: nf });
+    vOff += nv; fOff += nf;
+  });
+  const merged = BufferGeometryUtils.mergeGeometries(geometries);
+  faceToTooth = new Int32Array(fOff);
+  for (const info of toothInfo)
+    faceToTooth.fill(info.id, info.fStart, info.fStart + info.fCount);
+
+  modelMesh = new THREE.Mesh(merged, enamelMaterial);
+  modelMesh.name = 'dental-model';
+  scene.add(modelMesh);
   updateSelectionUI();
 }
 
 function clearModel() {
-  if (teethGroup) { scene.remove(teethGroup); teethGroup.traverse(o => o.geometry?.dispose()); }
-  teeth = [];
+  if (modelMesh) { scene.remove(modelMesh); modelMesh.geometry.dispose(); modelMesh = null; }
+  toothInfo = [];
+  faceToTooth = null;
   selected.clear();
   clearGrill();
   clearGems();
   clearStems();
   clearMeasurements();
+  updateSelectionUI();
 }
 
 /* ============================ STL upload ============================ */
@@ -359,15 +487,23 @@ document.getElementById('stlUpload').addEventListener('change', async (e) => {
     geometry.computeVertexNormals();
     geometry.center();
     clearModel();
-    teethGroup = new THREE.Group();
-    const mesh = new THREE.Mesh(geometry, enamelMaterial.clone());
-    mesh.userData = { isTooth: true, index: 0, uploaded: true };
-    teethGroup.add(mesh);
-    teeth = [mesh];
-    scene.add(teethGroup);
-    frameObject(mesh);
+    const nv = geometry.attributes.position.count;
+    const colors = new Float32Array(nv * 3);
+    for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.computeBoundingBox();
+    const nf = geometry.index ? geometry.index.count / 3 : nv / 3;
+    // the whole scan behaves as one paintable "tooth"
+    toothInfo = [{
+      id: 0, uploaded: true, vStart: 0, vCount: nv, fStart: 0, fCount: nf,
+      zTop: geometry.boundingBox.max.z, zBottom: geometry.boundingBox.min.z,
+    }];
+    faceToTooth = null;
+    modelMesh = new THREE.Mesh(geometry, enamelMaterial);
+    scene.add(modelMesh);
+    frameObject(modelMesh);
     setStatus(`Loaded ${file.name} — paint it to select.`);
-  } catch (err) {
+  } catch {
     setStatus('⚠ Could not parse that STL file.');
   }
   e.target.value = '';
@@ -375,7 +511,7 @@ document.getElementById('stlUpload').addEventListener('change', async (e) => {
 document.getElementById('btnResetArch').addEventListener('click', () => {
   buildProceduralArch();
   controls.target.set(0, 5, 0);
-  camera.position.set(0, 95, 28);
+  camera.position.set(0, 95, 24);
   setStatus('Demo arch restored.');
 });
 
@@ -389,22 +525,23 @@ function frameObject(obj) {
 
 /* ========================= Tools & painting ========================= */
 
-let tool = 'orbit';                       // orbit | paint | erase | measure
+let tool = 'orbit';                          // orbit | paint | erase | measure
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let isPainting = false;
 let downPos = null;
 
 function setTool(next) {
+  if (tool === 'measure' && next !== 'measure') cancelPendingMeasurement();
   tool = next;
-  controls.enabled = (tool === 'orbit');
+  controls.enabled = (tool === 'orbit' || tool === 'measure');
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('tool-active'));
   document.getElementById('tool' + next[0].toUpperCase() + next.slice(1)).classList.add('tool-active');
   const hints = {
     orbit: 'Left-drag: rotate · Right-drag: pan · Wheel: zoom',
     paint: 'Drag across teeth to paint them yellow',
     erase: 'Drag across painted teeth to deselect',
-    measure: 'Click two points on the model to measure in mm',
+    measure: 'Click point A, then point B — distance shows in mm',
   };
   document.getElementById('hint').textContent = hints[next];
 }
@@ -421,22 +558,25 @@ function updatePointer(e) {
 
 function raycast(objects) {
   raycaster.setFromCamera(pointer, camera);
-  return raycaster.intersectObjects(objects, false)[0] || null;
+  return raycaster.intersectObjects(objects.filter(Boolean), false)[0] || null;
+}
+
+function tintTooth(id, color) {
+  const info = toothInfo[id];
+  const attr = modelMesh.geometry.attributes.color;
+  for (let i = info.vStart; i < info.vStart + info.vCount; i++)
+    attr.setXYZ(i, color.r, color.g, color.b);
+  attr.needsUpdate = true;
 }
 
 function paintAt(e, add) {
+  if (!modelMesh) return;
   updatePointer(e);
-  const hit = raycast(teeth);
-  if (!hit) return;
-  const mesh = hit.object;
-  if (add && !selected.has(mesh)) {
-    selected.add(mesh);
-    mesh.userData.baseMaterial = mesh.material;
-    mesh.material = paintedMaterial;
-  } else if (!add && selected.has(mesh)) {
-    selected.delete(mesh);
-    mesh.material = mesh.userData.baseMaterial || enamelMaterial.clone();
-  }
+  const hit = raycast([modelMesh]);
+  if (!hit || hit.faceIndex === undefined) return;
+  const id = faceToTooth ? faceToTooth[hit.faceIndex] : 0;
+  if (add && !selected.has(id)) { selected.add(id); tintTooth(id, PAINT_COLOR); }
+  else if (!add && selected.has(id)) { selected.delete(id); tintTooth(id, ENAMEL_COLOR); }
   updateSelectionUI();
 }
 
@@ -454,68 +594,122 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('pointermove', (e) => {
   if (isPainting) paintAt(e, tool === 'paint');
+  if (tool === 'measure') updateMeasurePreview(e);
 });
 window.addEventListener('pointerup', (e) => {
   isPainting = false;
   if (!downPos) return;
   const moved = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]);
   downPos = null;
-  if (moved > 5 || e.button !== 0) return;          // it was a drag, not a click
+  if (moved > 5 || e.button !== 0) return;   // it was a drag, not a click
   if (tool === 'measure') measureClick(e);
   else if (stemMode) stemClick(e);
   else if (gemEditMode) gemClick(e);
 });
 
-/* ======================= Measurement tool (mm) ======================= */
+/* =================== Distance measurement tool (mm) =================== */
+/* State machine: 'idle' -> click A (red sphere) -> 'placedA' (dashed
+   preview follows the cursor) -> click B -> neon-green tube + floating
+   mm label at the midpoint -> back to 'idle'.                           */
 
-const measurements = [];                  // { line, spheres[], labelEl, a, b }
-let pendingPoint = null;
+const NEON_GREEN = 0x39ff14;
+let measureState = 'idle';
+let pointA = null;
+let markerA = null;                          // red sphere at point A
+let previewLine = null;                      // dashed line A -> cursor
+const measurements = [];                     // { group, labelEl, a, b }
+
+const markerGeometry = new THREE.SphereGeometry(0.5, 14, 10);
+const markerRedMaterial = new THREE.MeshBasicMaterial({ color: 0xff2d2d });
+const markerGreenMaterial = new THREE.MeshBasicMaterial({ color: NEON_GREEN });
 
 function measurableObjects() {
-  const list = [...teeth];
-  if (grillMesh) list.push(grillMesh);
-  return list;
+  return [modelMesh, grillMesh, ...stems].filter(Boolean);
 }
 
 function measureClick(e) {
   updatePointer(e);
   const hit = raycast(measurableObjects());
   if (!hit) return;
-  if (!pendingPoint) {
-    pendingPoint = hit.point.clone();
-    setStatus('First point set — click the second point.');
+  const point = hit.point.clone();           // exact world coordinate
+
+  if (measureState === 'idle') {
+    pointA = point;
+    markerA = new THREE.Mesh(markerGeometry, markerRedMaterial);
+    markerA.position.copy(pointA);
+    scene.add(markerA);
+    measureState = 'placedA';
+    setStatus('Point A set — click point B.');
     return;
   }
-  const a = pendingPoint, b = hit.point.clone();
-  pendingPoint = null;
-  const dist = a.distanceTo(b);
 
-  const sphereGeo = new THREE.SphereGeometry(0.45, 12, 8);
-  const sphereMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-  const s1 = new THREE.Mesh(sphereGeo, sphereMat); s1.position.copy(a);
-  const s2 = new THREE.Mesh(sphereGeo, sphereMat); s2.position.copy(b);
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([a, b]),
-    new THREE.LineBasicMaterial({ color: 0x38bdf8 })
+  // second click: finalize
+  const pointB = point;
+  const distance = pointA.distanceTo(pointB);          // true Euclidean mm
+  removePreviewLine();
+
+  const group = new THREE.Group();
+  // endpoint spheres
+  const sA = new THREE.Mesh(markerGeometry, markerGreenMaterial); sA.position.copy(pointA);
+  const sB = new THREE.Mesh(markerGeometry, markerGreenMaterial); sB.position.copy(pointB);
+  // solid cylindrical tube between A and B
+  const axis = new THREE.Vector3().subVectors(pointB, pointA);
+  const tube = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.16, Math.max(axis.length(), 1e-3), 8),
+    new THREE.MeshBasicMaterial({ color: NEON_GREEN })
   );
-  scene.add(s1, s2, line);
+  tube.position.copy(pointA).addScaledVector(axis, 0.5);
+  tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.clone().normalize());
+  group.add(sA, sB, tube);
+  scene.add(group);
 
   const labelEl = document.createElement('div');
   labelEl.className = 'measure-label';
-  labelEl.textContent = dist.toFixed(2) + ' mm';
+  labelEl.textContent = distance.toFixed(2) + ' mm';
   document.getElementById('labels').appendChild(labelEl);
 
-  measurements.push({ line, spheres: [s1, s2], labelEl, a, b });
-  setStatus(`Distance: ${dist.toFixed(2)} mm`);
+  measurements.push({ group, labelEl, a: pointA.clone(), b: pointB.clone() });
+
+  scene.remove(markerA); markerA = null;
+  pointA = null;
+  measureState = 'idle';
+  setStatus(`Distance: ${distance.toFixed(2)} mm`);
+}
+
+function updateMeasurePreview(e) {
+  if (measureState !== 'placedA') return;
+  updatePointer(e);
+  const hit = raycast(measurableObjects());
+  if (!hit) { removePreviewLine(); return; }
+  if (!previewLine) {
+    previewLine = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineDashedMaterial({ color: 0xff6b6b, dashSize: 1.2, gapSize: 0.7 })
+    );
+    scene.add(previewLine);
+  }
+  previewLine.geometry.setFromPoints([pointA, hit.point]);
+  previewLine.computeLineDistances();
+}
+
+function removePreviewLine() {
+  if (previewLine) { scene.remove(previewLine); previewLine.geometry.dispose(); previewLine = null; }
+}
+
+function cancelPendingMeasurement() {
+  removePreviewLine();
+  if (markerA) { scene.remove(markerA); markerA = null; }
+  pointA = null;
+  measureState = 'idle';
 }
 
 function clearMeasurements() {
+  cancelPendingMeasurement();
   for (const m of measurements) {
-    scene.remove(m.line, ...m.spheres);
+    scene.remove(m.group);
     m.labelEl.remove();
   }
   measurements.length = 0;
-  pendingPoint = null;
 }
 document.getElementById('btnClearMeasure').onclick = clearMeasurements;
 
@@ -536,7 +730,7 @@ function updateMeasureLabels() {
 /* ===================== Diamonds (InstancedMesh) ===================== */
 
 const GEM_CAPACITY = 4096;
-let gems = [];                            // { position, quaternion, size, enabled }
+let gems = [];                               // { position, quaternion, size, enabled }
 let gemInstances = null;
 let gemEditMode = false;
 
@@ -552,7 +746,7 @@ function makeGemGeometry() {
   const merged = BufferGeometryUtils.mergeGeometries(
     [crown, table, pavilion].map(g => g.toNonIndexed())
   );
-  merged.rotateX(Math.PI / 2);            // gem "up" (table) points to local +Z
+  merged.rotateX(Math.PI / 2);               // gem table points to local +Z
   merged.computeVertexNormals();
   return merged;
 }
@@ -565,46 +759,40 @@ function rebuildGemInstances() {
   gemInstances = new THREE.InstancedMesh(gemGeometry, gemMaterial, Math.min(active.length, GEM_CAPACITY));
   const m = new THREE.Matrix4(), s = new THREE.Vector3();
   active.slice(0, GEM_CAPACITY).forEach((g, i) => {
-    s.setScalar(g.size / 2);              // geometry radius 1 => diameter = size
+    s.setScalar(g.size / 2);                 // geometry radius 1 => diameter = size
     m.compose(g.position, g.quaternion, s);
     gemInstances.setMatrixAt(i, m);
-    g.instanceId = i;
   });
   gemInstances.instanceMatrix.needsUpdate = true;
   scene.add(gemInstances);
   updateGemReport();
 }
 
-function surfaceOffset() {
-  // Sit gems on the metal if the grill exists, else lightly above the enamel.
-  return grillMesh
-    ? parseFloat(sldClearance.value) + parseFloat(sldThickness.value)
-    : 0.15;
-}
-
 const _zAxis = new THREE.Vector3(0, 0, 1);
 function gemAt(worldPos, worldNormal, size) {
   const q = new THREE.Quaternion().setFromUnitVectors(_zAxis, worldNormal);
-  const p = worldPos.clone().addScaledVector(worldNormal, surfaceOffset() + size * 0.12);
+  const p = worldPos.clone().addScaledVector(worldNormal, size * 0.15);
   return { position: p, quaternion: q, size, enabled: true };
 }
 
-/* Pavé layout: walk the front-facing band of each painted tooth's
-   ellipsoid parametrically, so gems follow the surface normals. */
-function paveTooth(mesh, size, rows) {
+/* Pavé layout: fire a grid of rays at each painted tooth's labial face so
+   gems land on the ACTUAL surface (metal grill if generated, else enamel)
+   and orient along its true normals. */
+function paveTooth(info, size, rows) {
   const placed = [];
-  const dims = mesh.userData.dims;
-  const nm = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+  const targets = [grillMesh, modelMesh].filter(Boolean);
+  const nm = new THREE.Matrix3();
 
-  if (!dims) {                            // uploaded STL: sample front vertices
-    const pos = mesh.geometry.attributes.position;
-    const nor = mesh.geometry.attributes.normal;
+  if (info.uploaded) {                       // scan: sample front-facing vertices
+    nm.getNormalMatrix(modelMesh.matrixWorld);
+    const pos = modelMesh.geometry.attributes.position;
+    const nor = modelMesh.geometry.attributes.normal;
     const kept = [];
     const v = new THREE.Vector3(), n = new THREE.Vector3();
     for (let i = 0; i < pos.count; i += 7) {
       n.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
       if (n.y < 0.45) continue;
-      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      v.fromBufferAttribute(pos, i).applyMatrix4(modelMesh.matrixWorld);
       if (kept.some(k => k.distanceTo(v) < size * 1.35)) continue;
       kept.push(v.clone());
       placed.push(gemAt(v, n.clone(), size));
@@ -612,24 +800,28 @@ function paveTooth(mesh, size, rows) {
     return placed;
   }
 
-  const { w, d, h } = dims;
-  const rx = w / 2, ry = d / 2, rz = h / 2;
-  const arcHalf = 0.95;                   // radians of the labial band we pavé
-  const cols = Math.max(1, Math.floor((arcHalf * 2 * (rx + ry) * 0.5) / (size * 1.45)));
-  const rowStep = Math.min(0.42, (size * 1.5) / rz);
+  const out = info.outward;
+  const tangent = new THREE.Vector3(-out.y, out.x, 0);
+  const usableW = info.dims.w * 0.76;
+  const cols = Math.max(1, Math.floor(usableW / (size * 1.4)));
+  const rc = new THREE.Raycaster();
+  const origin = new THREE.Vector3(), dir = out.clone().negate();
 
-  const local = new THREE.Vector3(), normal = new THREE.Vector3();
   for (let r = 0; r < rows; r++) {
-    const phi = (r - (rows - 1) / 2) * rowStep;
+    const z = info.zBottom + info.dims.h * (0.16 + 0.60 * (r + 0.5) / rows);
     for (let c = 0; c < cols; c++) {
-      const theta = -arcHalf + (c + 0.5) * (2 * arcHalf / cols);
-      // point on unit sphere, +Y = labial
-      const ux = Math.cos(phi) * Math.sin(theta);
-      const uy = Math.cos(phi) * Math.cos(theta);
-      const uz = Math.sin(phi);
-      local.set(ux * rx, uy * ry, uz * rz).applyMatrix4(mesh.matrixWorld);
-      normal.set(ux / rx, uy / ry, uz / rz).applyMatrix3(nm).normalize();
-      placed.push(gemAt(local, normal.clone(), size));
+      const t = (c + 0.5) * (usableW / cols) - usableW / 2;
+      origin.set(info.center.x, info.center.y, 0)
+        .addScaledVector(out, info.dims.d * 0.5 + 5)
+        .addScaledVector(tangent, t);
+      origin.z = z;
+      rc.set(origin, dir);
+      const hit = rc.intersectObjects(targets, false)[0];
+      if (!hit || !hit.face) continue;
+      nm.getNormalMatrix(hit.object.matrixWorld);
+      const n = hit.face.normal.clone().applyMatrix3(nm).normalize();
+      if (n.dot(out) < 0.25) continue;       // skip glancing side hits
+      placed.push(gemAt(hit.point, n, size));
     }
   }
   return placed;
@@ -639,7 +831,7 @@ document.getElementById('btnAddGems').onclick = () => {
   if (!selected.size) { setStatus('⚠ Paint some teeth first, then pavé them.'); return; }
   const size = parseFloat(sldGemSize.value);
   const rows = parseInt(sldGemRows.value, 10);
-  for (const mesh of selected) gems.push(...paveTooth(mesh, size, rows));
+  for (const id of selected) gems.push(...paveTooth(toothInfo[id], size, rows));
   rebuildGemInstances();
   setStatus(`Placed gems — ${gems.filter(g => g.enabled).length} total.`);
 };
@@ -694,7 +886,7 @@ document.getElementById('chkStems').addEventListener('change', (e) => {
 
 function stemClick(e) {
   updatePointer(e);
-  const hit = raycast(measurableObjects());
+  const hit = raycast([grillMesh, modelMesh].filter(Boolean));
   if (!hit || !hit.face) return;
   const normal = hit.face.normal.clone()
     .applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld))
@@ -702,9 +894,9 @@ function stemClick(e) {
   const length = parseFloat(sldStemLen.value);
   // tapered sprue: narrow where it meets the piece, wide at the feed end
   const geo = new THREE.CylinderGeometry(1.1, 0.55, length, 12);
-  geo.rotateX(Math.PI / 2);               // axis -> local +Z
+  geo.rotateX(Math.PI / 2);                  // axis -> local +Z
   geo.translate(0, 0, length / 2);
-  const stem = new THREE.Mesh(geo, METALS[currentMetal]);
+  const stem = new THREE.Mesh(geo, METALS[currentMetal].mat);
   stem.position.copy(hit.point);
   stem.quaternion.setFromUnitVectors(_zAxis, normal);
   scene.add(stem);
@@ -731,36 +923,30 @@ function clearGrill() {
 }
 
 /* Extract the painted surface in world space as indexed vertices/faces,
-   trimming triangles inside the gum-side edge margin. */
+   trimming triangles inside the gum-side edge margin. Geometry is baked
+   in world space, so vertices go straight to the backend. */
 function collectSelectionGeometry(edgeMargin) {
   const vertices = [], faces = [];
+  const pos = modelMesh.geometry.attributes.position;
+  const index = modelMesh.geometry.index;
   const v = new THREE.Vector3();
 
-  for (const mesh of selected) {
-    const geometry = mesh.geometry;
-    const pos = geometry.attributes.position;
-    const index = geometry.index;
-    if (!geometry.boundingBox) geometry.computeBoundingBox();
-    const zCut = geometry.boundingBox.max.z - edgeMargin;   // trim near the gum line (+Z)
-
+  for (const id of selected) {
+    const info = toothInfo[id];
+    const zCut = info.zTop - edgeMargin;     // trim near the gum line (+Z)
     const remap = new Map();
-    const localZ = i => pos.getZ(i);
     const mapVertex = (i) => {
       if (remap.has(i)) return remap.get(i);
-      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
-      const id = vertices.length;
+      v.fromBufferAttribute(pos, i).applyMatrix4(modelMesh.matrixWorld);
+      const newId = vertices.length;
       vertices.push([v.x, v.y, v.z]);
-      remap.set(i, id);
-      return id;
+      remap.set(i, newId);
+      return newId;
     };
-
-    const triCount = index ? index.count / 3 : pos.count / 3;
-    for (let t = 0; t < triCount; t++) {
-      const a = index ? index.getX(t * 3) : t * 3;
-      const b = index ? index.getX(t * 3 + 1) : t * 3 + 1;
-      const c = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+    for (let f = info.fStart; f < info.fStart + info.fCount; f++) {
+      const a = index.getX(f * 3), b = index.getX(f * 3 + 1), c = index.getX(f * 3 + 2);
       if (edgeMargin > 0 &&
-          localZ(a) > zCut && localZ(b) > zCut && localZ(c) > zCut) continue;
+          pos.getZ(a) > zCut && pos.getZ(b) > zCut && pos.getZ(c) > zCut) continue;
       faces.push([mapVertex(a), mapVertex(b), mapVertex(c)]);
     }
   }
@@ -776,7 +962,7 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     inner_clearance: parseFloat(sldClearance.value),
     shell_thickness: parseFloat(sldThickness.value),
     back_side_thinner_ratio: parseInt(sldBackThin.value, 10) / 100,
-    smoothing_iterations: 4,
+    smooth_iterations: parseInt(sldSmooth.value, 10),
   });
 
   document.getElementById('loading').classList.remove('hidden');
@@ -798,8 +984,8 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     geometry.deleteAttribute('normal');
     geometry = BufferGeometryUtils.mergeVertices(geometry, 1e-4);
     geometry.computeVertexNormals();
-    clearGrillMeshOnly();
-    grillMesh = new THREE.Mesh(geometry, METALS[currentMetal]);   // world coords -> identity transform overlays teeth
+    if (grillMesh) { scene.remove(grillMesh); grillMesh.geometry.dispose(); }
+    grillMesh = new THREE.Mesh(geometry, METALS[currentMetal].mat);  // world coords -> identity overlays teeth
     scene.add(grillMesh);
     document.getElementById('btnDownloadGrill').disabled = false;
     const watertight = res.headers.get('X-Watertight') === 'true';
@@ -811,9 +997,21 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
   }
 });
 
-function clearGrillMeshOnly() {
-  if (grillMesh) { scene.remove(grillMesh); grillMesh.geometry.dispose(); grillMesh = null; }
-}
+/* ================== Material preview (live PBR swap) ================== */
+
+document.querySelectorAll('.metal-swatch').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentMetal = btn.dataset.metal;
+    document.querySelectorAll('.metal-swatch').forEach(b => b.classList.remove('metal-active'));
+    btn.classList.add('metal-active');
+    const preset = METALS[currentMetal];
+    document.getElementById('metalName').textContent = preset.name;
+    document.getElementById('metalSpec').textContent = preset.spec;
+    if (grillMesh) grillMesh.material = preset.mat;   // instant update
+    stems.forEach(s => s.material = preset.mat);
+    setStatus(`Material: ${preset.name}.`);
+  });
+});
 
 /* ============================= Export ============================= */
 
@@ -833,7 +1031,7 @@ document.getElementById('btnDownloadScene').onclick = () => {
   const group = new THREE.Group();
   const add = (mesh) => {
     const c = new THREE.Mesh(mesh.geometry, mesh.material);
-    c.applyMatrix4(mesh.matrixWorld);   // fresh identity mesh -> world transform applied once
+    c.applyMatrix4(mesh.matrixWorld);        // fresh identity mesh -> world transform applied once
     group.add(c);
   };
   if (grillMesh) add(grillMesh);
@@ -854,21 +1052,11 @@ document.getElementById('btnDownloadScene').onclick = () => {
   setStatus('Scene STL downloaded.');
 };
 
-document.querySelectorAll('.metal-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentMetal = btn.dataset.metal;
-    document.querySelectorAll('.metal-btn').forEach(b => b.classList.replace('ring-amber-400', 'ring-transparent'));
-    btn.classList.replace('ring-transparent', 'ring-amber-400');
-    if (grillMesh) grillMesh.material = METALS[currentMetal];
-    stems.forEach(s => s.material = METALS[currentMetal]);
-  });
-});
-
 /* ======================== Camera POV buttons ======================== */
 
 const VIEWS = {
   front: { pos: [0, 95, 22],  up: [0, 0, 1] },
-  bite:  { pos: [0, 14, -95], up: [0, 1, 0] },   // looking up at the bite surface
+  bite:  { pos: [0, 14, -95], up: [0, 1, 0] },   // looking up at the biting surfaces
   back:  { pos: [0, -85, 26], up: [0, 0, 1] },
 };
 document.querySelectorAll('.view-btn').forEach(btn => {
@@ -897,6 +1085,7 @@ const sldThickness = document.getElementById('sldThickness');
 const sldClearance = document.getElementById('sldClearance');
 const sldMargin    = document.getElementById('sldMargin');
 const sldBackThin  = document.getElementById('sldBackThin');
+const sldSmooth    = document.getElementById('sldSmooth');
 const sldGemSize   = document.getElementById('sldGemSize');
 const sldGemRows   = document.getElementById('sldGemRows');
 const sldStemLen   = document.getElementById('sldStemLen');
@@ -911,6 +1100,7 @@ bindSlider(sldThickness, 'valThickness', v => v.toFixed(2) + ' mm');
 bindSlider(sldClearance, 'valClearance', v => v.toFixed(2) + ' mm');
 bindSlider(sldMargin,    'valMargin',    v => v.toFixed(1) + ' mm');
 bindSlider(sldBackThin,  'valBackThin',  v => v.toFixed(0) + ' %');
+bindSlider(sldSmooth,    'valSmooth',    v => v.toFixed(0));
 bindSlider(sldGemSize,   'valGemSize',   v => v.toFixed(2) + ' mm');
 bindSlider(sldGemRows,   'valGemRows',   v => v.toFixed(0));
 bindSlider(sldStemLen,   'valStemLen',   v => v.toFixed(1) + ' mm');
