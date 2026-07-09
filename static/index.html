@@ -80,7 +80,7 @@
           <input id="stlUpload" type="file" accept=".stl" class="hidden">
         </label>
         <button id="btnResetArch" class="mt-1.5 w-full text-[10px] px-2 py-1 rounded bg-[#161b26] text-slate-500 hover:text-slate-300 transition">reset to demo arch</button>
-        <p class="mt-1 text-[10px] text-slate-600 leading-snug">No file? A realistic procedural dental arch is generated so the app works instantly.</p>
+        <p class="mt-1 text-[10px] text-slate-600 leading-snug">No file? A realistic dental cast (anatomical scan models) loads automatically.</p>
       </div>
 
       <div class="mt-auto rounded-lg bg-[#161b26] p-3">
@@ -296,6 +296,9 @@ const enamelMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.02, roughness: 0.30, envMapIntensity: 0.8,
 });
 const gemMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.35, roughness: 0.04, envMapIntensity: 2.4 });
+const castMaterial = new THREE.MeshStandardMaterial({   // dental-stone plaster look for the jaw cast
+  color: 0xcfc6ba, metalness: 0.0, roughness: 0.65, envMapIntensity: 0.5,
+});
 
 /* ================== Realistic procedural dental arch ================== */
 /* Each tooth is a deformed superellipsoid:
@@ -398,9 +401,88 @@ function makeToothGeometry(type, w, d, h) {
 }
 
 let modelMesh = null;                        // single merged mesh (arch or uploaded scan)
+let jawMesh = null;                          // non-paintable jaw cast backdrop (realistic arch)
 let toothInfo = [];                          // per tooth: ranges + placement metadata
 let faceToTooth = null;                      // faceIndex -> tooth id (null = whole mesh is tooth 0)
 const selected = new Set();                  // painted tooth ids
+
+/* Shared assembly: record per-tooth vertex/face ranges, add enamel color
+   attributes, merge everything into ONE paintable mesh. `toothInfo` must
+   already hold one metadata entry per geometry, in the same order. */
+function assembleModel(geometries) {
+  let vOff = 0, fOff = 0;
+  geometries.forEach((g, k) => {
+    const nv = g.attributes.position.count;
+    const nf = g.index.count / 3;
+    const colors = new Float32Array(nv * 3);
+    for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    Object.assign(toothInfo[k], { vStart: vOff, vCount: nv, fStart: fOff, fCount: nf });
+    vOff += nv; fOff += nf;
+  });
+  const merged = BufferGeometryUtils.mergeGeometries(geometries);
+  faceToTooth = new Int32Array(fOff);
+  for (const info of toothInfo)
+    faceToTooth.fill(info.id, info.fStart, info.fStart + info.fCount);
+  modelMesh = new THREE.Mesh(merged, enamelMaterial);
+  modelMesh.name = 'dental-model';
+  scene.add(modelMesh);
+  updateSelectionUI();
+}
+
+/* ---- Realistic arch: anatomical scans vendored from the MIT-licensed
+        github.com/iiitl/molars models (see static/models/LICENSE.txt).
+        Six paintable anterior teeth + a jaw cast backdrop, preprocessed
+        to mm and to this app's axis convention. ---- */
+
+const REAL_ARCH = { teeth: 6, a: 21, b: 30 };   // approximate arch ellipse for outward vectors
+
+async function loadRealisticArch() {
+  const fetchStl = async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`fetch failed: ${url}`);
+    return res.arrayBuffer();
+  };
+  const buffers = await Promise.all([
+    ...Array.from({ length: REAL_ARCH.teeth }, (_, i) => fetchStl(`/static/models/tooth_${i}.stl`)),
+    fetchStl('/static/models/jaw.stl'),
+  ]);
+  clearModel();
+
+  const loader = new STLLoader();
+  const prepare = (buffer) => {
+    let g = loader.parse(buffer);
+    g.deleteAttribute('normal');
+    g = BufferGeometryUtils.mergeVertices(g, 1e-4);
+    g.computeVertexNormals();
+    return g;
+  };
+
+  const geometries = buffers.slice(0, REAL_ARCH.teeth).map(prepare);
+  toothInfo = geometries.map((g, id) => {
+    g.computeBoundingBox();
+    const center = g.boundingBox.getCenter(new THREE.Vector3());
+    const size = g.boundingBox.getSize(new THREE.Vector3());
+    const outward = new THREE.Vector3(
+      center.x / (REAL_ARCH.a * REAL_ARCH.a),
+      center.y / (REAL_ARCH.b * REAL_ARCH.b), 0).normalize();
+    const tangent = new THREE.Vector3(-outward.y, outward.x, 0);
+    return {
+      id, center, outward,
+      dims: {
+        w: Math.abs(size.x * tangent.x) + Math.abs(size.y * tangent.y),
+        d: Math.abs(size.x * outward.x) + Math.abs(size.y * outward.y),
+        h: size.z,
+      },
+      zTop: g.boundingBox.max.z, zBottom: g.boundingBox.min.z,
+    };
+  });
+  assembleModel(geometries);
+
+  jawMesh = new THREE.Mesh(prepare(buffers[REAL_ARCH.teeth]), castMaterial);
+  jawMesh.name = 'jaw-cast';
+  scene.add(jawMesh);
+}
 
 function buildProceduralArch() {
   clearModel();
@@ -440,30 +522,12 @@ function buildProceduralArch() {
     }
   }
 
-  // record ranges, give every tooth an enamel-tinted color attribute, merge
-  let vOff = 0, fOff = 0;
-  geometries.forEach((g, k) => {
-    const nv = g.attributes.position.count;
-    const nf = g.index.count / 3;
-    const colors = new Float32Array(nv * 3);
-    for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    Object.assign(toothInfo[k], { vStart: vOff, vCount: nv, fStart: fOff, fCount: nf });
-    vOff += nv; fOff += nf;
-  });
-  const merged = BufferGeometryUtils.mergeGeometries(geometries);
-  faceToTooth = new Int32Array(fOff);
-  for (const info of toothInfo)
-    faceToTooth.fill(info.id, info.fStart, info.fStart + info.fCount);
-
-  modelMesh = new THREE.Mesh(merged, enamelMaterial);
-  modelMesh.name = 'dental-model';
-  scene.add(modelMesh);
-  updateSelectionUI();
+  assembleModel(geometries);
 }
 
 function clearModel() {
   if (modelMesh) { scene.remove(modelMesh); modelMesh.geometry.dispose(); modelMesh = null; }
+  if (jawMesh) { scene.remove(jawMesh); jawMesh.geometry.dispose(); jawMesh = null; }
   toothInfo = [];
   faceToTooth = null;
   selected.clear();
@@ -508,11 +572,20 @@ document.getElementById('stlUpload').addEventListener('change', async (e) => {
   }
   e.target.value = '';
 });
-document.getElementById('btnResetArch').addEventListener('click', () => {
-  buildProceduralArch();
+async function loadDefaultArch() {
+  try {
+    await loadRealisticArch();
+    setStatus('Realistic dental cast loaded (models: github.com/iiitl/molars, MIT).');
+  } catch {
+    buildProceduralArch();                   // offline / models missing
+    setStatus('Procedural demo arch loaded (realistic models unavailable).');
+  }
+}
+
+document.getElementById('btnResetArch').addEventListener('click', async () => {
+  await loadDefaultArch();
   controls.target.set(0, 5, 0);
   camera.position.set(0, 95, 24);
-  setStatus('Demo arch restored.');
 });
 
 function frameObject(obj) {
@@ -624,7 +697,7 @@ const markerRedMaterial = new THREE.MeshBasicMaterial({ color: 0xff2d2d });
 const markerGreenMaterial = new THREE.MeshBasicMaterial({ color: NEON_GREEN });
 
 function measurableObjects() {
-  return [modelMesh, grillMesh, ...stems].filter(Boolean);
+  return [modelMesh, jawMesh, grillMesh, ...stems].filter(Boolean);
 }
 
 function measureClick(e) {
@@ -886,7 +959,7 @@ document.getElementById('chkStems').addEventListener('change', (e) => {
 
 function stemClick(e) {
   updatePointer(e);
-  const hit = raycast([grillMesh, modelMesh].filter(Boolean));
+  const hit = raycast([grillMesh, modelMesh, jawMesh].filter(Boolean));
   if (!hit || !hit.face) return;
   const normal = hit.face.normal.clone()
     .applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld))
@@ -1117,7 +1190,7 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-buildProceduralArch();
+loadDefaultArch();
 resize();
 
 renderer.setAnimationLoop(() => {

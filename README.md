@@ -26,10 +26,13 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
 
 ## Workflow
 
-1. A **realistic procedural dental arch** loads instantly — trapezoidal incisors,
-   pointed diamond-profile canines, and cusped premolars/molars built from
-   deformed superellipsoids and merged into a single paintable mesh (or upload
-   your own STL scan).
+1. A **realistic dental cast** loads instantly: six anatomical anterior tooth
+   scans plus a full jaw-cast backdrop (converted from the MIT-licensed
+   [iiitl/molars](https://github.com/iiitl/molars) models — see
+   `static/models/LICENSE.txt`), merged into a single paintable mesh. If the
+   model files are unavailable the app falls back to a procedural arch built
+   from deformed superellipsoids (trapezoidal incisors, pointed canines,
+   cusped premolars/molars). You can also upload your own STL scan.
 2. **Paint** the target teeth with the brush tool (yellow highlight).
 3. Tune **Wall Thickness / Inner Clearance / Edge Margin / Back-Side Thinning /
    Smooth Strength** (0 keeps every cusp of the anatomy, 10 melts the shell
