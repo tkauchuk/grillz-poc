@@ -207,18 +207,18 @@
       <div class="shrink-0 p-4 border-t border-[#232a38] bg-[#0d1017]">
         <p class="panel-title mb-3">Material Preview</p>
         <div class="flex items-center gap-4">
-          <button data-metal="gold" title="Yellow Gold"
+          <button data-metal="gold" title="18K Deep Yellow Gold"
             class="metal-swatch metal-active"
-            style="background: radial-gradient(circle at 32% 28%, #fff3b0, #ffd700 48%, #a8860b 92%)"></button>
-          <button data-metal="rose" title="Rose Gold"
+            style="background: radial-gradient(circle at 32% 28%, #f8e7ad, #e6c35c 48%, #92702a 92%)"></button>
+          <button data-metal="rose" title="14K Warm Rose Gold"
             class="metal-swatch"
-            style="background: radial-gradient(circle at 32% 28%, #f3c9c9, #b76e79 52%, #6e3b44 92%)"></button>
-          <button data-metal="silver" title="Polished Silver"
+            style="background: radial-gradient(circle at 32% 28%, #f4d3c6, #dca08f 52%, #8a5546 92%)"></button>
+          <button data-metal="silver" title="950 Platinum"
             class="metal-swatch"
-            style="background: radial-gradient(circle at 32% 28%, #ffffff, #e3e4e5 48%, #83878c 92%)"></button>
+            style="background: radial-gradient(circle at 32% 28%, #ffffff, #e2e5e7 48%, #83878c 92%)"></button>
           <div class="ml-1">
-            <p id="metalName" class="text-xs font-bold text-slate-100">Yellow Gold</p>
-            <p id="metalSpec" class="text-[10px] text-slate-500 font-mono">#ffd700 · rough 0.15</p>
+            <p id="metalName" class="text-xs font-bold text-slate-100">18K Deep Yellow Gold</p>
+            <p id="metalSpec" class="text-[10px] text-slate-500 font-mono">#e6c35c · rough 0.08</p>
           </div>
         </div>
       </div>
@@ -263,14 +263,17 @@ controls.target.set(0, 5, 0);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-/* Warm three-point studio setup so the metals throw rich reflections. */
-const keyLight = new THREE.DirectionalLight(0xffe0b8, 1.9);
+/* Professional studio rig: strong ambient base + warm key, cool fill and
+   warm backlight for sharp specular highlights on polished metal. The
+   PMREM-filtered RoomEnvironment above supplies the reflection vectors —
+   without it, metalness-1 materials would render black. */
+const keyLight = new THREE.DirectionalLight(0xfff1dd, 2.2);   // warm key
 keyLight.position.set(35, 90, 70);
-const fillLight = new THREE.DirectionalLight(0xbcd0ff, 0.5);
+const fillLight = new THREE.DirectionalLight(0xcfe0ff, 0.8);  // cool fill
 fillLight.position.set(-70, -20, 30);
-const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.9);
-rimLight.position.set(-10, -90, 55);
-scene.add(keyLight, fillLight, rimLight, new THREE.AmbientLight(0xfff4e0, 0.22));
+const backLight = new THREE.DirectionalLight(0xffe6c2, 1.2);  // warm backlight
+backLight.position.set(-10, -90, 55);
+scene.add(keyLight, fillLight, backLight, new THREE.AmbientLight(0xffffff, 0.45));
 
 const grid = new THREE.GridHelper(220, 22, 0x232a38, 0x161b26);
 grid.rotation.x = Math.PI / 2;            // lie in the XY plane
@@ -279,25 +282,34 @@ scene.add(grid);
 
 /* ============================ Materials ============================ */
 
+/* High-end jewelry presets: mirror-polished, fully metallic. */
 const METALS = {
-  gold:   { name: 'Yellow Gold',     spec: '#ffd700 · rough 0.15',
-            mat: new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 1.0, roughness: 0.15, envMapIntensity: 1.5 }) },
-  rose:   { name: 'Rose Gold',       spec: '#b76e79 · rough 0.18',
-            mat: new THREE.MeshStandardMaterial({ color: 0xb76e79, metalness: 1.0, roughness: 0.18, envMapIntensity: 1.5 }) },
-  silver: { name: 'Polished Silver', spec: '#e3e4e5 · rough 0.12',
-            mat: new THREE.MeshStandardMaterial({ color: 0xe3e4e5, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.5 }) },
+  gold:   { name: '18K Deep Yellow Gold', spec: '#e6c35c · rough 0.08',
+            mat: new THREE.MeshStandardMaterial({ color: 0xe6c35c, metalness: 1.0, roughness: 0.08, envMapIntensity: 2.0 }) },
+  rose:   { name: '14K Warm Rose Gold',   spec: '#dca08f · rough 0.10',
+            mat: new THREE.MeshStandardMaterial({ color: 0xdca08f, metalness: 1.0, roughness: 0.10, envMapIntensity: 2.0 }) },
+  silver: { name: '950 Platinum',         spec: '#e2e5e7 · rough 0.05',
+            mat: new THREE.MeshStandardMaterial({ color: 0xe2e5e7, metalness: 1.0, roughness: 0.05, envMapIntensity: 2.0 }) },
 };
 let currentMetal = 'gold';
 
-const ENAMEL_COLOR = new THREE.Color(0xf3ecd9);
+/* Dental scan: matte plaster. */
+const ENAMEL_COLOR = new THREE.Color(0xeae9e6);
 const PAINT_COLOR  = new THREE.Color(0xffd83d);
 const enamelMaterial = new THREE.MeshStandardMaterial({
   color: 0xffffff, vertexColors: true,
-  metalness: 0.02, roughness: 0.30, envMapIntensity: 0.8,
+  metalness: 0.0, roughness: 0.70, envMapIntensity: 0.4,
 });
-const gemMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.35, roughness: 0.04, envMapIntensity: 2.4 });
+/* Brilliant-cut stone: refractive physical material; flat shading makes
+   each cut facet catch the studio lights individually. */
+const gemMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff, metalness: 0.0, roughness: 0.02,
+  transmission: 0.9, ior: 2.4, thickness: 0.6,
+  clearcoat: 1.0, clearcoatRoughness: 0.02,
+  envMapIntensity: 2.5, flatShading: true,
+});
 const castMaterial = new THREE.MeshStandardMaterial({   // dental-stone plaster look for the jaw cast
-  color: 0xcfc6ba, metalness: 0.0, roughness: 0.65, envMapIntensity: 0.5,
+  color: 0xd9d5cd, metalness: 0.0, roughness: 0.75, envMapIntensity: 0.4,
 });
 
 /* ================== Realistic procedural dental arch ================== */
@@ -807,17 +819,30 @@ let gems = [];                               // { position, quaternion, size, en
 let gemInstances = null;
 let gemEditMode = false;
 
+/* Brilliant-cut diamond: octagonal table + truncated-cone crown + girdle
+   band + inverted-cone pavilion, all 8 radial segments. Kept non-indexed
+   (no vertex welding) so computeVertexNormals() yields hard per-facet
+   normals — with flatShading each facet becomes its own mirror. */
 function makeGemGeometry() {
-  const crown = new THREE.CylinderGeometry(0.55, 1.0, 0.4, 8, 1, true);
-  crown.translate(0, 0.2, 0);
-  const table = new THREE.CircleGeometry(0.55, 8);
+  const SEG = 8;
+  const girdleR = 1.0, tableR = 0.55;
+  const crownH = 0.45, girdleH = 0.12, pavilionH = 1.05;
+
+  const table = new THREE.CircleGeometry(tableR, SEG);
   table.rotateX(-Math.PI / 2);
-  table.translate(0, 0.4, 0);
-  const pavilion = new THREE.ConeGeometry(1.0, 1.1, 8, 1, true);
+  table.translate(0, girdleH / 2 + crownH, 0);
+  const crown = new THREE.CylinderGeometry(tableR, girdleR, crownH, SEG, 1, true);
+  crown.translate(0, girdleH / 2 + crownH / 2, 0);
+  // offset the crown facets half a step against the girdle for extra sparkle
+  table.rotateY(Math.PI / SEG);
+  crown.rotateY(Math.PI / SEG);
+  const girdle = new THREE.CylinderGeometry(girdleR, girdleR, girdleH, SEG, 1, true);
+  const pavilion = new THREE.ConeGeometry(girdleR, pavilionH, SEG, 1, true);
   pavilion.rotateX(Math.PI);
-  pavilion.translate(0, -0.55, 0);
+  pavilion.translate(0, -girdleH / 2 - pavilionH / 2, 0);
+
   const merged = BufferGeometryUtils.mergeGeometries(
-    [crown, table, pavilion].map(g => g.toNonIndexed())
+    [table, crown, girdle, pavilion].map(g => g.toNonIndexed())
   );
   merged.rotateX(Math.PI / 2);               // gem table points to local +Z
   merged.computeVertexNormals();
