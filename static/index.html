@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grillz Design Platform — CAD</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  html, body { height: 100%; overflow: hidden; background: #0a0c10; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #2b3140; border-radius: 3px; }
+  .tab-active { background: #1c2333; color: #fbbf24; border-bottom: 2px solid #fbbf24; }
+  .tool-active { background: #fbbf24 !important; color: #0a0c10 !important; }
+  input[type=range] { -webkit-appearance: none; height: 4px; border-radius: 2px; background: #2b3140; width: 100%; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fbbf24; cursor: pointer; box-shadow: 0 0 6px rgba(251,191,36,.6); }
+  .measure-label { position: absolute; transform: translate(-50%, -130%); background: rgba(10,12,16,.85); color: #fbbf24; font: 600 11px/1 ui-monospace, monospace; padding: 4px 7px; border-radius: 5px; border: 1px solid #3a4155; pointer-events: none; white-space: nowrap; }
+  .panel-title { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #6b7488; font-weight: 700; }
+</style>
+</head>
+<body class="text-slate-300 select-none">
+
+<div class="flex flex-col h-screen">
+
+  <!-- ======================= TOP BAR ======================= -->
+  <header class="flex items-center gap-4 px-4 h-12 shrink-0 bg-[#10141c] border-b border-[#232a38] z-20">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">💎</span>
+      <h1 class="font-black tracking-widest text-sm text-slate-100">GRILLZ<span class="text-amber-400">CAD</span></h1>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#232a38] text-slate-400">POC</span>
+    </div>
+    <div class="flex-1"></div>
+    <span id="status" class="text-xs text-slate-500 truncate max-w-[40ch]">Paint teeth, then generate.</span>
+    <button id="btnGenerate"
+      class="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-600 text-black text-xs font-extrabold tracking-wide hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-900/40">
+      ⚡ GENERATE GRILLZ
+    </button>
+  </header>
+
+  <div class="flex flex-1 min-h-0">
+
+    <!-- ======================= LEFT PANEL ======================= -->
+    <aside class="w-52 shrink-0 bg-[#10141c] border-r border-[#232a38] p-3 flex flex-col gap-5 overflow-y-auto z-10">
+
+      <div>
+        <p class="panel-title mb-2">Camera POV</p>
+        <div class="grid gap-1.5">
+          <button data-view="front" class="view-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">🦷 Front Arc</button>
+          <button data-view="bite"  class="view-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">⬇️ Bottom / Bite</button>
+          <button data-view="back"  class="view-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">🔄 Back Side</button>
+        </div>
+      </div>
+
+      <div>
+        <p class="panel-title mb-2">Tools</p>
+        <div class="grid gap-1.5">
+          <button id="toolOrbit"   class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition tool-active">🖐 Orbit / Inspect</button>
+          <button id="toolPaint"   class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">🖌 Paint Teeth</button>
+          <button id="toolErase"   class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">🧽 Erase Paint</button>
+          <button id="toolMeasure" class="tool-btn text-left text-xs px-3 py-2 rounded-md bg-[#1c2333] hover:bg-[#273044] transition">📏 Measure (mm)</button>
+        </div>
+        <button id="btnClearMeasure" class="mt-1.5 w-full text-[10px] px-2 py-1 rounded bg-[#161b26] text-slate-500 hover:text-slate-300 transition">clear measurements</button>
+      </div>
+
+      <div>
+        <p class="panel-title mb-2">Scan Input</p>
+        <label class="block text-center text-xs px-3 py-2 rounded-md border border-dashed border-[#3a4155] hover:border-amber-400 cursor-pointer transition">
+          📂 Upload STL scan
+          <input id="stlUpload" type="file" accept=".stl" class="hidden">
+        </label>
+        <button id="btnResetArch" class="mt-1.5 w-full text-[10px] px-2 py-1 rounded bg-[#161b26] text-slate-500 hover:text-slate-300 transition">reset to demo arch</button>
+        <p class="mt-1 text-[10px] text-slate-600 leading-snug">No file? A procedural dental arch is generated so the app works instantly.</p>
+      </div>
+
+      <div class="mt-auto rounded-lg bg-[#161b26] p-3">
+        <p class="panel-title mb-1">Selection</p>
+        <p class="text-2xl font-black text-amber-400"><span id="selCount">0</span><span class="text-xs font-medium text-slate-500"> teeth painted</span></p>
+        <p class="text-[10px] text-slate-600 mt-1">Drag with 🖌 Paint to select teeth for the grill.</p>
+      </div>
+    </aside>
+
+    <!-- ======================= CENTER: 3D VIEWPORT ======================= -->
+    <main id="viewport" class="relative flex-1 min-w-0">
+      <canvas id="canvas3d" class="absolute inset-0 w-full h-full block"></canvas>
+      <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+      <div id="hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-1.5 rounded-full bg-black/60 text-slate-400 backdrop-blur pointer-events-none">
+        Left-drag: rotate · Right-drag: pan · Wheel: zoom
+      </div>
+      <div id="loading" class="hidden absolute inset-0 grid place-items-center bg-black/50 backdrop-blur-sm z-30">
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-10 h-10 rounded-full border-4 border-amber-400 border-t-transparent animate-spin"></div>
+          <p class="text-xs text-amber-300 font-semibold tracking-wide">Computing watertight shell…</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- ======================= RIGHT CAD SIDEBAR ======================= -->
+    <aside class="w-80 shrink-0 bg-[#10141c] border-l border-[#232a38] flex flex-col z-10">
+      <nav class="flex shrink-0 border-b border-[#232a38] text-[11px] font-bold tracking-wide">
+        <button data-tab="adjust"   class="tab flex-1 py-2.5 tab-active">ADJUST</button>
+        <button data-tab="diamonds" class="tab flex-1 py-2.5 hover:text-slate-100">DIAMONDS</button>
+        <button data-tab="stems"    class="tab flex-1 py-2.5 hover:text-slate-100">STEMS</button>
+        <button data-tab="export"   class="tab flex-1 py-2.5 hover:text-slate-100">EXPORT</button>
+      </nav>
+
+      <div class="flex-1 overflow-y-auto p-4">
+
+        <!-- ---- TAB: ADJUST ---- -->
+        <section id="tab-adjust" class="tab-panel space-y-6">
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Wall Thickness</span><span class="text-amber-400 font-mono" id="valThickness">0.80 mm</span></div>
+            <input type="range" id="sldThickness" min="0.3" max="2.5" step="0.05" value="0.8">
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Inner Clearance (fit gap)</span><span class="text-amber-400 font-mono" id="valClearance">0.10 mm</span></div>
+            <input type="range" id="sldClearance" min="0" max="0.5" step="0.01" value="0.1">
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Edge Margin (gum trim)</span><span class="text-amber-400 font-mono" id="valMargin">1.0 mm</span></div>
+            <input type="range" id="sldMargin" min="0" max="3" step="0.1" value="1">
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Back-Side Thinning</span><span class="text-amber-400 font-mono" id="valBackThin">45 %</span></div>
+            <input type="range" id="sldBackThin" min="0" max="90" step="5" value="45">
+            <p class="text-[10px] text-slate-600 mt-1.5 leading-snug">Lingual (tongue-side) walls are dynamically thinned by up to this ratio for bite comfort.</p>
+          </div>
+          <div class="rounded-lg bg-[#161b26] p-3 text-[11px] leading-relaxed text-slate-500">
+            The backend offsets the painted surface by the clearance, extrudes a variable-thickness outer shell, Laplacian-polishes it, then stitches the rims into a <span class="text-slate-300">watertight manifold</span> ready for casting.
+          </div>
+        </section>
+
+        <!-- ---- TAB: DIAMONDS ---- -->
+        <section id="tab-diamonds" class="tab-panel hidden space-y-6">
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Gem Size</span><span class="text-amber-400 font-mono" id="valGemSize">1.20 mm</span></div>
+            <input type="range" id="sldGemSize" min="0.8" max="2.2" step="0.1" value="1.2">
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Rows per Tooth</span><span class="text-amber-400 font-mono" id="valGemRows">2</span></div>
+            <input type="range" id="sldGemRows" min="1" max="4" step="1" value="2">
+          </div>
+          <button id="btnAddGems" class="w-full py-2 rounded-lg bg-[#1c2333] hover:bg-[#273044] text-xs font-bold text-sky-300 transition">✨ Pavé painted teeth</button>
+          <button id="btnClearGems" class="w-full py-1.5 rounded-lg bg-[#161b26] text-xs text-slate-500 hover:text-slate-300 transition">Clear all gems</button>
+          <label class="flex items-center gap-3 text-xs cursor-pointer">
+            <input type="checkbox" id="chkGemEdit" class="accent-amber-400 w-4 h-4">
+            <span>Individual gem edit mode <span class="text-slate-600">(click a gem to remove it)</span></span>
+          </label>
+          <div>
+            <p class="panel-title mb-2">Stone Report</p>
+            <table class="w-full text-[11px]">
+              <thead><tr class="text-slate-600 text-left"><th class="pb-1 font-semibold">Size</th><th class="pb-1 font-semibold">Count</th><th class="pb-1 font-semibold">Carat est.</th></tr></thead>
+              <tbody id="gemReport"><tr><td colspan="3" class="text-slate-600 py-2">No gems placed.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ---- TAB: STEMS ---- -->
+        <section id="tab-stems" class="tab-panel hidden space-y-5">
+          <label class="flex items-center gap-3 text-xs cursor-pointer">
+            <input type="checkbox" id="chkStems" class="accent-amber-400 w-4 h-4">
+            <span class="font-bold">Casting sprue placement mode</span>
+          </label>
+          <p class="text-[11px] text-slate-500 leading-relaxed">With this mode on, click the <span class="text-slate-300">underside</span> of the design to spawn tapered sprue branches for lost-wax casting. Sprues feed molten metal into the mold.</p>
+          <div>
+            <div class="flex justify-between text-xs mb-2"><span>Sprue Length</span><span class="text-amber-400 font-mono" id="valStemLen">6.0 mm</span></div>
+            <input type="range" id="sldStemLen" min="3" max="12" step="0.5" value="6">
+          </div>
+          <div class="rounded-lg bg-[#161b26] p-3">
+            <p class="text-xs">Placed sprues: <span id="stemCount" class="text-amber-400 font-mono font-bold">0</span></p>
+          </div>
+          <button id="btnClearStems" class="w-full py-1.5 rounded-lg bg-[#161b26] text-xs text-slate-500 hover:text-slate-300 transition">Clear all sprues</button>
+        </section>
+
+        <!-- ---- TAB: EXPORT ---- -->
+        <section id="tab-export" class="tab-panel hidden space-y-6">
+          <div>
+            <p class="panel-title mb-2">Metal Finish (PBR)</p>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-metal="gold" class="metal-btn rounded-lg p-2 bg-[#1c2333] hover:bg-[#273044] transition ring-2 ring-amber-400">
+                <div class="h-9 rounded-md" style="background:radial-gradient(circle at 35% 30%, #ffe9a8, #d4af37 55%, #8a6d1d)"></div>
+                <p class="text-[10px] mt-1.5 font-bold">Gold</p>
+              </button>
+              <button data-metal="rose" class="metal-btn rounded-lg p-2 bg-[#1c2333] hover:bg-[#273044] transition ring-2 ring-transparent">
+                <div class="h-9 rounded-md" style="background:radial-gradient(circle at 35% 30%, #ffd9c9, #e0937a 55%, #93513c)"></div>
+                <p class="text-[10px] mt-1.5 font-bold">Rose Gold</p>
+              </button>
+              <button data-metal="silver" class="metal-btn rounded-lg p-2 bg-[#1c2333] hover:bg-[#273044] transition ring-2 ring-transparent">
+                <div class="h-9 rounded-md" style="background:radial-gradient(circle at 35% 30%, #ffffff, #c9cdd4 55%, #7b8087)"></div>
+                <p class="text-[10px] mt-1.5 font-bold">Silver</p>
+              </button>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <button id="btnDownloadGrill" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-600 text-black text-xs font-extrabold tracking-wide hover:brightness-110 transition disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+              ⬇ Download Grill STL (watertight)
+            </button>
+            <button id="btnDownloadScene" class="w-full py-2 rounded-lg bg-[#1c2333] hover:bg-[#273044] text-xs font-bold text-slate-300 transition">
+              ⬇ Download Full Scene STL (grill + gems + sprues)
+            </button>
+          </div>
+          <div class="rounded-lg bg-[#161b26] p-3 text-[11px] leading-relaxed text-slate-500">
+            The grill STL comes straight from the backend as a <span class="text-slate-300">binary, watertight manifold</span> — send it to a caster or resin printer as-is.
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ============================ Scene setup ============================ */
+/* Units are millimetres. Dental convention used throughout:
+   +Y = labial (front of the smile), -Y = lingual (back), +Z = up. */
+
+const viewport = document.getElementById('viewport');
+const canvas   = document.getElementById('canvas3d');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e13);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
+camera.up.set(0, 0, 1);
+camera.position.set(0, 95, 28);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 5, 0);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(30, 80, 60);
+scene.add(key, new THREE.DirectionalLight(0x8899ff, 0.4).translateY(-80), new THREE.AmbientLight(0xffffff, 0.25));
+
+const grid = new THREE.GridHelper(220, 22, 0x232a38, 0x161b26);
+grid.rotation.x = Math.PI / 2;   // lie in the XY plane
+grid.position.z = -16;
+scene.add(grid);
+
+/* ============================ Materials ============================ */
+
+const METALS = {
+  gold:   new THREE.MeshStandardMaterial({ color: 0xffc94d, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.6 }),
+  rose:   new THREE.MeshStandardMaterial({ color: 0xe8a17a, metalness: 1.0, roughness: 0.14, envMapIntensity: 1.6 }),
+  silver: new THREE.MeshStandardMaterial({ color: 0xf4f4f0, metalness: 1.0, roughness: 0.10, envMapIntensity: 1.6 }),
+};
+let currentMetal = 'gold';
+
+const enamelMaterial = new THREE.MeshStandardMaterial({ color: 0xf1ead9, metalness: 0.02, roughness: 0.32, envMapIntensity: 0.8 });
+const paintedMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffd83d, emissive: 0x8a6a00, metalness: 0.1, roughness: 0.4,
+  transparent: true, opacity: 0.62, depthWrite: true,
+});
+const gemMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.35, roughness: 0.04, envMapIntensity: 2.4 });
+
+/* ====================== Procedural dental arch ====================== */
+/* Anatomy-ish tooth widths in mm, central incisors -> first molars.    */
+
+const TOOTH_SPECS = [                    // [width, depth, height]
+  [8.5, 7.0, 10.5], [6.6, 6.5, 9.5],     // incisors
+  [7.6, 7.8, 10.0],                      // canine
+  [7.0, 8.5, 8.5],  [6.8, 9.0, 8.0],     // premolars
+  [10.2, 10.5, 7.5],                     // molar
+];
+const ARCH_A = 27, ARCH_B = 31;          // ellipse semi-axes (x, y)
+
+let teeth = [];                          // Mesh[] — paintable targets
+let teethGroup = null;
+const selected = new Set();              // tooth meshes currently painted
+
+function makeToothGeometry(w, d, h) {
+  const g = new THREE.SphereGeometry(0.5, 22, 18);
+  const pos = g.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {   // square the crown a little
+    v.fromBufferAttribute(pos, i);
+    const squish = 1 + 0.16 * (1 - Math.abs(v.z * 2) ** 3);
+    pos.setXYZ(i, v.x * squish, v.y * squish, v.z);
+  }
+  g.scale(w, d, h);
+  g.computeVertexNormals();
+  return g;
+}
+
+function buildProceduralArch() {
+  clearModel();
+  teethGroup = new THREE.Group();
+  teethGroup.name = 'arch';
+  let index = 0;
+
+  for (const side of [1, -1]) {
+    let t = side * 0.055;                 // small gap at the midline
+    for (let i = 0; i < TOOTH_SPECS.length; i++) {
+      const [w, d, h] = TOOTH_SPECS[i];
+      // walk the ellipse by (approximate) arc length so teeth touch nicely
+      const r = Math.hypot(ARCH_A * Math.sin(t), ARCH_B * Math.cos(t));
+      const dt = side * (w * 0.60) / r;
+      if (i > 0) t += dt;
+      const x = ARCH_A * Math.sin(t);
+      const y = ARCH_B * Math.cos(t);
+      const n = new THREE.Vector3(x / (ARCH_A * ARCH_A), y / (ARCH_B * ARCH_B), 0).normalize();
+
+      const mesh = new THREE.Mesh(makeToothGeometry(w, d, h), enamelMaterial.clone());
+      mesh.position.set(x + n.x * d * 0.1, y + n.y * d * 0.1, 0);
+      mesh.rotation.z = Math.atan2(-n.x, n.y);       // local +Y faces outward
+      mesh.userData = { isTooth: true, index: index++, dims: { w, d, h } };
+      teethGroup.add(mesh);
+      teeth.push(mesh);
+      t += dt;                                        // advance past this tooth
+    }
+  }
+  scene.add(teethGroup);
+  updateSelectionUI();
+}
+
+function clearModel() {
+  if (teethGroup) { scene.remove(teethGroup); teethGroup.traverse(o => o.geometry?.dispose()); }
+  teeth = [];
+  selected.clear();
+  clearGrill();
+  clearGems();
+  clearStems();
+  clearMeasurements();
+}
+
+/* ============================ STL upload ============================ */
+
+document.getElementById('stlUpload').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buffer = await file.arrayBuffer();
+  try {
+    let geometry = new STLLoader().parse(buffer);
+    geometry.deleteAttribute('normal');
+    geometry = BufferGeometryUtils.mergeVertices(geometry, 1e-4);
+    geometry.computeVertexNormals();
+    geometry.center();
+    clearModel();
+    teethGroup = new THREE.Group();
+    const mesh = new THREE.Mesh(geometry, enamelMaterial.clone());
+    mesh.userData = { isTooth: true, index: 0, uploaded: true };
+    teethGroup.add(mesh);
+    teeth = [mesh];
+    scene.add(teethGroup);
+    frameObject(mesh);
+    setStatus(`Loaded ${file.name} — paint it to select.`);
+  } catch (err) {
+    setStatus('⚠ Could not parse that STL file.');
+  }
+  e.target.value = '';
+});
+document.getElementById('btnResetArch').addEventListener('click', () => {
+  buildProceduralArch();
+  controls.target.set(0, 5, 0);
+  camera.position.set(0, 95, 28);
+  setStatus('Demo arch restored.');
+});
+
+function frameObject(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(0, size * 1.4, size * 0.4));
+}
+
+/* ========================= Tools & painting ========================= */
+
+let tool = 'orbit';                       // orbit | paint | erase | measure
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let isPainting = false;
+let downPos = null;
+
+function setTool(next) {
+  tool = next;
+  controls.enabled = (tool === 'orbit');
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('tool-active'));
+  document.getElementById('tool' + next[0].toUpperCase() + next.slice(1)).classList.add('tool-active');
+  const hints = {
+    orbit: 'Left-drag: rotate · Right-drag: pan · Wheel: zoom',
+    paint: 'Drag across teeth to paint them yellow',
+    erase: 'Drag across painted teeth to deselect',
+    measure: 'Click two points on the model to measure in mm',
+  };
+  document.getElementById('hint').textContent = hints[next];
+}
+document.getElementById('toolOrbit').onclick   = () => setTool('orbit');
+document.getElementById('toolPaint').onclick   = () => setTool('paint');
+document.getElementById('toolErase').onclick   = () => setTool('erase');
+document.getElementById('toolMeasure').onclick = () => setTool('measure');
+
+function updatePointer(e) {
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function raycast(objects) {
+  raycaster.setFromCamera(pointer, camera);
+  return raycaster.intersectObjects(objects, false)[0] || null;
+}
+
+function paintAt(e, add) {
+  updatePointer(e);
+  const hit = raycast(teeth);
+  if (!hit) return;
+  const mesh = hit.object;
+  if (add && !selected.has(mesh)) {
+    selected.add(mesh);
+    mesh.userData.baseMaterial = mesh.material;
+    mesh.material = paintedMaterial;
+  } else if (!add && selected.has(mesh)) {
+    selected.delete(mesh);
+    mesh.material = mesh.userData.baseMaterial || enamelMaterial.clone();
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  document.getElementById('selCount').textContent = selected.size;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  downPos = [e.clientX, e.clientY];
+  if (e.button !== 0) return;
+  if (tool === 'paint' || tool === 'erase') {
+    isPainting = true;
+    paintAt(e, tool === 'paint');
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (isPainting) paintAt(e, tool === 'paint');
+});
+window.addEventListener('pointerup', (e) => {
+  isPainting = false;
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]);
+  downPos = null;
+  if (moved > 5 || e.button !== 0) return;          // it was a drag, not a click
+  if (tool === 'measure') measureClick(e);
+  else if (stemMode) stemClick(e);
+  else if (gemEditMode) gemClick(e);
+});
+
+/* ======================= Measurement tool (mm) ======================= */
+
+const measurements = [];                  // { line, spheres[], labelEl, a, b }
+let pendingPoint = null;
+
+function measurableObjects() {
+  const list = [...teeth];
+  if (grillMesh) list.push(grillMesh);
+  return list;
+}
+
+function measureClick(e) {
+  updatePointer(e);
+  const hit = raycast(measurableObjects());
+  if (!hit) return;
+  if (!pendingPoint) {
+    pendingPoint = hit.point.clone();
+    setStatus('First point set — click the second point.');
+    return;
+  }
+  const a = pendingPoint, b = hit.point.clone();
+  pendingPoint = null;
+  const dist = a.distanceTo(b);
+
+  const sphereGeo = new THREE.SphereGeometry(0.45, 12, 8);
+  const sphereMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  const s1 = new THREE.Mesh(sphereGeo, sphereMat); s1.position.copy(a);
+  const s2 = new THREE.Mesh(sphereGeo, sphereMat); s2.position.copy(b);
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([a, b]),
+    new THREE.LineBasicMaterial({ color: 0x38bdf8 })
+  );
+  scene.add(s1, s2, line);
+
+  const labelEl = document.createElement('div');
+  labelEl.className = 'measure-label';
+  labelEl.textContent = dist.toFixed(2) + ' mm';
+  document.getElementById('labels').appendChild(labelEl);
+
+  measurements.push({ line, spheres: [s1, s2], labelEl, a, b });
+  setStatus(`Distance: ${dist.toFixed(2)} mm`);
+}
+
+function clearMeasurements() {
+  for (const m of measurements) {
+    scene.remove(m.line, ...m.spheres);
+    m.labelEl.remove();
+  }
+  measurements.length = 0;
+  pendingPoint = null;
+}
+document.getElementById('btnClearMeasure').onclick = clearMeasurements;
+
+function updateMeasureLabels() {
+  const rect = canvas.getBoundingClientRect();
+  const mid = new THREE.Vector3();
+  for (const m of measurements) {
+    mid.addVectors(m.a, m.b).multiplyScalar(0.5).project(camera);
+    const visible = mid.z < 1;
+    m.labelEl.style.display = visible ? 'block' : 'none';
+    if (visible) {
+      m.labelEl.style.left = ((mid.x * 0.5 + 0.5) * rect.width) + 'px';
+      m.labelEl.style.top = ((-mid.y * 0.5 + 0.5) * rect.height) + 'px';
+    }
+  }
+}
+
+/* ===================== Diamonds (InstancedMesh) ===================== */
+
+const GEM_CAPACITY = 4096;
+let gems = [];                            // { position, quaternion, size, enabled }
+let gemInstances = null;
+let gemEditMode = false;
+
+function makeGemGeometry() {
+  const crown = new THREE.CylinderGeometry(0.55, 1.0, 0.4, 8, 1, true);
+  crown.translate(0, 0.2, 0);
+  const table = new THREE.CircleGeometry(0.55, 8);
+  table.rotateX(-Math.PI / 2);
+  table.translate(0, 0.4, 0);
+  const pavilion = new THREE.ConeGeometry(1.0, 1.1, 8, 1, true);
+  pavilion.rotateX(Math.PI);
+  pavilion.translate(0, -0.55, 0);
+  const merged = BufferGeometryUtils.mergeGeometries(
+    [crown, table, pavilion].map(g => g.toNonIndexed())
+  );
+  merged.rotateX(Math.PI / 2);            // gem "up" (table) points to local +Z
+  merged.computeVertexNormals();
+  return merged;
+}
+const gemGeometry = makeGemGeometry();
+
+function rebuildGemInstances() {
+  if (gemInstances) { scene.remove(gemInstances); gemInstances.dispose(); gemInstances = null; }
+  const active = gems.filter(g => g.enabled);
+  if (!active.length) { updateGemReport(); return; }
+  gemInstances = new THREE.InstancedMesh(gemGeometry, gemMaterial, Math.min(active.length, GEM_CAPACITY));
+  const m = new THREE.Matrix4(), s = new THREE.Vector3();
+  active.slice(0, GEM_CAPACITY).forEach((g, i) => {
+    s.setScalar(g.size / 2);              // geometry radius 1 => diameter = size
+    m.compose(g.position, g.quaternion, s);
+    gemInstances.setMatrixAt(i, m);
+    g.instanceId = i;
+  });
+  gemInstances.instanceMatrix.needsUpdate = true;
+  scene.add(gemInstances);
+  updateGemReport();
+}
+
+function surfaceOffset() {
+  // Sit gems on the metal if the grill exists, else lightly above the enamel.
+  return grillMesh
+    ? parseFloat(sldClearance.value) + parseFloat(sldThickness.value)
+    : 0.15;
+}
+
+const _zAxis = new THREE.Vector3(0, 0, 1);
+function gemAt(worldPos, worldNormal, size) {
+  const q = new THREE.Quaternion().setFromUnitVectors(_zAxis, worldNormal);
+  const p = worldPos.clone().addScaledVector(worldNormal, surfaceOffset() + size * 0.12);
+  return { position: p, quaternion: q, size, enabled: true };
+}
+
+/* Pavé layout: walk the front-facing band of each painted tooth's
+   ellipsoid parametrically, so gems follow the surface normals. */
+function paveTooth(mesh, size, rows) {
+  const placed = [];
+  const dims = mesh.userData.dims;
+  const nm = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+
+  if (!dims) {                            // uploaded STL: sample front vertices
+    const pos = mesh.geometry.attributes.position;
+    const nor = mesh.geometry.attributes.normal;
+    const kept = [];
+    const v = new THREE.Vector3(), n = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i += 7) {
+      n.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
+      if (n.y < 0.45) continue;
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      if (kept.some(k => k.distanceTo(v) < size * 1.35)) continue;
+      kept.push(v.clone());
+      placed.push(gemAt(v, n.clone(), size));
+    }
+    return placed;
+  }
+
+  const { w, d, h } = dims;
+  const rx = w / 2, ry = d / 2, rz = h / 2;
+  const arcHalf = 0.95;                   // radians of the labial band we pavé
+  const cols = Math.max(1, Math.floor((arcHalf * 2 * (rx + ry) * 0.5) / (size * 1.45)));
+  const rowStep = Math.min(0.42, (size * 1.5) / rz);
+
+  const local = new THREE.Vector3(), normal = new THREE.Vector3();
+  for (let r = 0; r < rows; r++) {
+    const phi = (r - (rows - 1) / 2) * rowStep;
+    for (let c = 0; c < cols; c++) {
+      const theta = -arcHalf + (c + 0.5) * (2 * arcHalf / cols);
+      // point on unit sphere, +Y = labial
+      const ux = Math.cos(phi) * Math.sin(theta);
+      const uy = Math.cos(phi) * Math.cos(theta);
+      const uz = Math.sin(phi);
+      local.set(ux * rx, uy * ry, uz * rz).applyMatrix4(mesh.matrixWorld);
+      normal.set(ux / rx, uy / ry, uz / rz).applyMatrix3(nm).normalize();
+      placed.push(gemAt(local, normal.clone(), size));
+    }
+  }
+  return placed;
+}
+
+document.getElementById('btnAddGems').onclick = () => {
+  if (!selected.size) { setStatus('⚠ Paint some teeth first, then pavé them.'); return; }
+  const size = parseFloat(sldGemSize.value);
+  const rows = parseInt(sldGemRows.value, 10);
+  for (const mesh of selected) gems.push(...paveTooth(mesh, size, rows));
+  rebuildGemInstances();
+  setStatus(`Placed gems — ${gems.filter(g => g.enabled).length} total.`);
+};
+document.getElementById('btnClearGems').onclick = clearGems;
+function clearGems() { gems = []; rebuildGemInstances(); }
+
+document.getElementById('chkGemEdit').addEventListener('change', (e) => {
+  gemEditMode = e.target.checked;
+  if (gemEditMode) setTool('orbit');
+  setStatus(gemEditMode ? 'Gem edit: click a gem to remove it.' : 'Gem edit off.');
+});
+
+function gemClick(e) {
+  if (!gemInstances) return;
+  updatePointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(gemInstances)[0];
+  if (!hit || hit.instanceId === undefined) return;
+  const target = gems.filter(g => g.enabled)[hit.instanceId];
+  if (target) { target.enabled = false; rebuildGemInstances(); }
+}
+
+function updateGemReport() {
+  const body = document.getElementById('gemReport');
+  const bySize = new Map();
+  for (const g of gems) if (g.enabled) bySize.set(g.size, (bySize.get(g.size) || 0) + 1);
+  if (!bySize.size) {
+    body.innerHTML = '<tr><td colspan="3" class="text-slate-600 py-2">No gems placed.</td></tr>';
+    return;
+  }
+  // round-diamond carat ≈ diameter³ × 0.0061 (per stone, rough estimate)
+  body.innerHTML = [...bySize.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([size, count]) =>
+      `<tr class="border-t border-[#232a38]">
+         <td class="py-1.5 text-amber-300 font-mono">${size.toFixed(1)} mm</td>
+         <td class="py-1.5 font-mono">${count} gems</td>
+         <td class="py-1.5 font-mono text-slate-500">${(count * 0.0061 * size ** 3).toFixed(2)} ct</td>
+       </tr>`).join('');
+}
+
+/* ========================== Casting stems ========================== */
+
+let stemMode = false;
+const stems = [];
+
+document.getElementById('chkStems').addEventListener('change', (e) => {
+  stemMode = e.target.checked;
+  if (stemMode) setTool('orbit');
+  setStatus(stemMode ? 'Sprue mode: click the underside of the design.' : 'Sprue mode off.');
+});
+
+function stemClick(e) {
+  updatePointer(e);
+  const hit = raycast(measurableObjects());
+  if (!hit || !hit.face) return;
+  const normal = hit.face.normal.clone()
+    .applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld))
+    .normalize();
+  const length = parseFloat(sldStemLen.value);
+  // tapered sprue: narrow where it meets the piece, wide at the feed end
+  const geo = new THREE.CylinderGeometry(1.1, 0.55, length, 12);
+  geo.rotateX(Math.PI / 2);               // axis -> local +Z
+  geo.translate(0, 0, length / 2);
+  const stem = new THREE.Mesh(geo, METALS[currentMetal]);
+  stem.position.copy(hit.point);
+  stem.quaternion.setFromUnitVectors(_zAxis, normal);
+  scene.add(stem);
+  stems.push(stem);
+  document.getElementById('stemCount').textContent = stems.length;
+}
+
+function clearStems() {
+  for (const s of stems) { scene.remove(s); s.geometry.dispose(); }
+  stems.length = 0;
+  document.getElementById('stemCount').textContent = '0';
+}
+document.getElementById('btnClearStems').onclick = clearStems;
+
+/* ==================== Generate grill (backend) ==================== */
+
+let grillMesh = null;
+let lastStlBlob = null;
+
+function clearGrill() {
+  if (grillMesh) { scene.remove(grillMesh); grillMesh.geometry.dispose(); grillMesh = null; }
+  lastStlBlob = null;
+  document.getElementById('btnDownloadGrill').disabled = true;
+}
+
+/* Extract the painted surface in world space as indexed vertices/faces,
+   trimming triangles inside the gum-side edge margin. */
+function collectSelectionGeometry(edgeMargin) {
+  const vertices = [], faces = [];
+  const v = new THREE.Vector3();
+
+  for (const mesh of selected) {
+    const geometry = mesh.geometry;
+    const pos = geometry.attributes.position;
+    const index = geometry.index;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    const zCut = geometry.boundingBox.max.z - edgeMargin;   // trim near the gum line (+Z)
+
+    const remap = new Map();
+    const localZ = i => pos.getZ(i);
+    const mapVertex = (i) => {
+      if (remap.has(i)) return remap.get(i);
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      const id = vertices.length;
+      vertices.push([v.x, v.y, v.z]);
+      remap.set(i, id);
+      return id;
+    };
+
+    const triCount = index ? index.count / 3 : pos.count / 3;
+    for (let t = 0; t < triCount; t++) {
+      const a = index ? index.getX(t * 3) : t * 3;
+      const b = index ? index.getX(t * 3 + 1) : t * 3 + 1;
+      const c = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+      if (edgeMargin > 0 &&
+          localZ(a) > zCut && localZ(b) > zCut && localZ(c) > zCut) continue;
+      faces.push([mapVertex(a), mapVertex(b), mapVertex(c)]);
+    }
+  }
+  return faces.length ? { vertices, faces } : null;
+}
+
+document.getElementById('btnGenerate').addEventListener('click', async () => {
+  if (!selected.size) { setStatus('⚠ Paint at least one tooth first (🖌 Paint tool).'); return; }
+  const payload = collectSelectionGeometry(parseFloat(sldMargin.value));
+  if (!payload) { setStatus('⚠ Edge margin removed all geometry — lower it.'); return; }
+
+  Object.assign(payload, {
+    inner_clearance: parseFloat(sldClearance.value),
+    shell_thickness: parseFloat(sldThickness.value),
+    back_side_thinner_ratio: parseInt(sldBackThin.value, 10) / 100,
+    smoothing_iterations: 4,
+  });
+
+  document.getElementById('loading').classList.remove('hidden');
+  try {
+    const res = await fetch('/api/generate-grill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+    const buffer = await res.arrayBuffer();
+    lastStlBlob = new Blob([buffer], { type: 'model/stl' });
+
+    // STL is a triangle soup; weld vertices for smooth (jewelry) shading
+    let geometry = new STLLoader().parse(buffer);
+    geometry.deleteAttribute('normal');
+    geometry = BufferGeometryUtils.mergeVertices(geometry, 1e-4);
+    geometry.computeVertexNormals();
+    clearGrillMeshOnly();
+    grillMesh = new THREE.Mesh(geometry, METALS[currentMetal]);   // world coords -> identity transform overlays teeth
+    scene.add(grillMesh);
+    document.getElementById('btnDownloadGrill').disabled = false;
+    const watertight = res.headers.get('X-Watertight') === 'true';
+    setStatus(`✅ Grill generated (${(buffer.byteLength / 1024).toFixed(0)} KB, ${watertight ? 'watertight' : 'check manifold'}).`);
+  } catch (err) {
+    setStatus('⚠ ' + err.message);
+  } finally {
+    document.getElementById('loading').classList.add('hidden');
+  }
+});
+
+function clearGrillMeshOnly() {
+  if (grillMesh) { scene.remove(grillMesh); grillMesh.geometry.dispose(); grillMesh = null; }
+}
+
+/* ============================= Export ============================= */
+
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById('btnDownloadGrill').onclick = () => {
+  if (lastStlBlob) download(lastStlBlob, 'grillz.stl');
+};
+
+document.getElementById('btnDownloadScene').onclick = () => {
+  const group = new THREE.Group();
+  const add = (mesh) => {
+    const c = new THREE.Mesh(mesh.geometry, mesh.material);
+    c.applyMatrix4(mesh.matrixWorld);   // fresh identity mesh -> world transform applied once
+    group.add(c);
+  };
+  if (grillMesh) add(grillMesh);
+  stems.forEach(add);
+  if (gemInstances) {
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < gemInstances.count; i++) {
+      gemInstances.getMatrixAt(i, m);
+      const gem = new THREE.Mesh(gemGeometry, gemMaterial);
+      gem.applyMatrix4(m);
+      group.add(gem);
+    }
+  }
+  if (!group.children.length) { setStatus('⚠ Nothing to export yet — generate a grill first.'); return; }
+  group.updateMatrixWorld(true);
+  const stl = new STLExporter().parse(group, { binary: true });
+  download(new Blob([stl.buffer], { type: 'model/stl' }), 'grillz-scene.stl');
+  setStatus('Scene STL downloaded.');
+};
+
+document.querySelectorAll('.metal-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentMetal = btn.dataset.metal;
+    document.querySelectorAll('.metal-btn').forEach(b => b.classList.replace('ring-amber-400', 'ring-transparent'));
+    btn.classList.replace('ring-transparent', 'ring-amber-400');
+    if (grillMesh) grillMesh.material = METALS[currentMetal];
+    stems.forEach(s => s.material = METALS[currentMetal]);
+  });
+});
+
+/* ======================== Camera POV buttons ======================== */
+
+const VIEWS = {
+  front: { pos: [0, 95, 22],  up: [0, 0, 1] },
+  bite:  { pos: [0, 14, -95], up: [0, 1, 0] },   // looking up at the bite surface
+  back:  { pos: [0, -85, 26], up: [0, 0, 1] },
+};
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = VIEWS[btn.dataset.view];
+    camera.up.fromArray(view.up);
+    camera.position.fromArray(view.pos).add(controls.target);
+    controls.update();
+  });
+});
+
+/* ============================== Tabs ============================== */
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('tab-active'));
+    btn.classList.add('tab-active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+  });
+});
+
+/* ======================= Slider value labels ======================= */
+
+const sldThickness = document.getElementById('sldThickness');
+const sldClearance = document.getElementById('sldClearance');
+const sldMargin    = document.getElementById('sldMargin');
+const sldBackThin  = document.getElementById('sldBackThin');
+const sldGemSize   = document.getElementById('sldGemSize');
+const sldGemRows   = document.getElementById('sldGemRows');
+const sldStemLen   = document.getElementById('sldStemLen');
+
+function bindSlider(slider, label, fmt) {
+  const el = document.getElementById(label);
+  const update = () => el.textContent = fmt(parseFloat(slider.value));
+  slider.addEventListener('input', update);
+  update();
+}
+bindSlider(sldThickness, 'valThickness', v => v.toFixed(2) + ' mm');
+bindSlider(sldClearance, 'valClearance', v => v.toFixed(2) + ' mm');
+bindSlider(sldMargin,    'valMargin',    v => v.toFixed(1) + ' mm');
+bindSlider(sldBackThin,  'valBackThin',  v => v.toFixed(0) + ' %');
+bindSlider(sldGemSize,   'valGemSize',   v => v.toFixed(2) + ' mm');
+bindSlider(sldGemRows,   'valGemRows',   v => v.toFixed(0));
+bindSlider(sldStemLen,   'valStemLen',   v => v.toFixed(1) + ' mm');
+
+/* ============================ Misc / loop ============================ */
+
+function setStatus(text) { document.getElementById('status').textContent = text; }
+
+function resize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+buildProceduralArch();
+resize();
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  updateMeasureLabels();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
