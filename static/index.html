@@ -108,7 +108,8 @@
     <!-- ======================= RIGHT CAD SIDEBAR ======================= -->
     <aside class="w-80 shrink-0 bg-[#10141c] border-l border-[#232a38] flex flex-col z-10">
       <nav class="flex shrink-0 border-b border-[#232a38] text-[11px] font-bold tracking-wide">
-        <button data-tab="adjust"   class="tab flex-1 py-2.5 tab-active">ADJUST</button>
+        <button data-tab="teeth"    class="tab flex-1 py-2.5 tab-active">TEETH</button>
+        <button data-tab="adjust"   class="tab flex-1 py-2.5 hover:text-slate-100">ADJUST</button>
         <button data-tab="diamonds" class="tab flex-1 py-2.5 hover:text-slate-100">DIAMONDS</button>
         <button data-tab="stems"    class="tab flex-1 py-2.5 hover:text-slate-100">STEMS</button>
         <button data-tab="export"   class="tab flex-1 py-2.5 hover:text-slate-100">EXPORT</button>
@@ -116,8 +117,28 @@
 
       <div class="flex-1 overflow-y-auto p-4">
 
+        <!-- ---- TAB: TEETH (automatic detection) ---- -->
+        <section id="tab-teeth" class="tab-panel space-y-4">
+          <button id="btnDetect" class="w-full py-2 rounded-lg bg-[#1c2333] hover:bg-[#273044] text-xs font-bold text-sky-300 transition">🔍 Detect teeth automatically</button>
+          <div class="flex gap-2">
+            <button id="btnSelectAll" class="flex-1 py-1.5 rounded-lg bg-[#161b26] text-[11px] font-bold text-slate-300 hover:bg-[#1c2333] transition">Select all</button>
+            <button id="btnClearSel"  class="flex-1 py-1.5 rounded-lg bg-[#161b26] text-[11px] text-slate-500 hover:text-slate-300 transition">Clear selection</button>
+          </div>
+          <div>
+            <p class="panel-title mb-2">Detected Teeth</p>
+            <table class="w-full text-[11px]">
+              <thead><tr class="text-slate-600 text-left">
+                <th class="pb-1 font-semibold">Tooth</th><th class="pb-1 font-semibold">Type</th>
+                <th class="pb-1 font-semibold">W×H mm</th><th class="pb-1 font-semibold text-center">Sel</th>
+              </tr></thead>
+              <tbody id="teethTable"><tr><td colspan="4" class="text-slate-600 py-2">No teeth detected yet.</td></tr></tbody>
+            </table>
+          </div>
+          <p class="text-[10px] text-slate-600 leading-snug">R/L = patient's right/left, numbered from the midline; the FDI code follows the dot. Click a row to add or remove that tooth from the grill selection. Uploaded scans are segmented automatically on the backend.</p>
+        </section>
+
         <!-- ---- TAB: ADJUST ---- -->
-        <section id="tab-adjust" class="tab-panel space-y-6">
+        <section id="tab-adjust" class="tab-panel hidden space-y-6">
           <div>
             <div class="flex justify-between text-xs mb-2"><span>Wall Thickness</span><span class="text-amber-400 font-mono" id="valThickness">0.80 mm</span></div>
             <input type="range" id="sldThickness" min="0.3" max="2.5" step="0.05" value="0.8">
@@ -432,11 +453,23 @@ function assembleModel(geometries) {
     Object.assign(toothInfo[k], { vStart: vOff, vCount: nv, fStart: fOff, fCount: nf });
     vOff += nv; fOff += nf;
   });
-  const merged = BufferGeometryUtils.mergeGeometries(geometries);
-  faceToTooth = new Int32Array(fOff);
+  assembleMergedModel(BufferGeometryUtils.mergeGeometries(geometries));
+}
+
+/* Final step shared by every model source: pre-merged geometry + toothInfo
+   ranges become the single paintable mesh with a color attribute. */
+function assembleMergedModel(geometry) {
+  if (!geometry.attributes.color) {
+    const nv = geometry.attributes.position.count;
+    const colors = new Float32Array(nv * 3);
+    for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  }
+  const totalFaces = geometry.index.count / 3;
+  faceToTooth = new Int32Array(totalFaces);
   for (const info of toothInfo)
     faceToTooth.fill(info.id, info.fStart, info.fStart + info.fCount);
-  modelMesh = new THREE.Mesh(merged, enamelMaterial);
+  modelMesh = new THREE.Mesh(geometry, enamelMaterial);
   modelMesh.name = 'dental-model';
   scene.add(modelMesh);
   updateSelectionUI();
@@ -449,28 +482,37 @@ function assembleModel(geometries) {
 
 const REAL_ARCH = { teeth: 6, a: 21, b: 30 };   // approximate arch ellipse for outward vectors
 
+/* Parse an STL buffer into welded, smooth-shaded indexed geometry. */
+function prepareStl(buffer) {
+  let g = new STLLoader().parse(buffer);
+  g.deleteAttribute('normal');
+  g = BufferGeometryUtils.mergeVertices(g, 1e-4);
+  g.computeVertexNormals();
+  return g;
+}
+
+/* Fetch with a hard timeout so a stalled request can never leave the
+   viewport empty forever — the caller falls back to the procedural arch. */
+async function fetchStl(url, timeoutMs = 30000) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctl.signal });
+    if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+    return await res.arrayBuffer();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function loadRealisticArch() {
-  const fetchStl = async (url) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`fetch failed: ${url}`);
-    return res.arrayBuffer();
-  };
   const buffers = await Promise.all([
     ...Array.from({ length: REAL_ARCH.teeth }, (_, i) => fetchStl(`/static/models/tooth_${i}.stl`)),
     fetchStl('/static/models/jaw.stl'),
   ]);
   clearModel();
 
-  const loader = new STLLoader();
-  const prepare = (buffer) => {
-    let g = loader.parse(buffer);
-    g.deleteAttribute('normal');
-    g = BufferGeometryUtils.mergeVertices(g, 1e-4);
-    g.computeVertexNormals();
-    return g;
-  };
-
-  const geometries = buffers.slice(0, REAL_ARCH.teeth).map(prepare);
+  const geometries = buffers.slice(0, REAL_ARCH.teeth).map(prepareStl);
   toothInfo = geometries.map((g, id) => {
     g.computeBoundingBox();
     const center = g.boundingBox.getCenter(new THREE.Vector3());
@@ -491,10 +533,108 @@ async function loadRealisticArch() {
   });
   assembleModel(geometries);
 
-  jawMesh = new THREE.Mesh(prepare(buffers[REAL_ARCH.teeth]), castMaterial);
+  jawMesh = new THREE.Mesh(prepareStl(buffers[REAL_ARCH.teeth]), castMaterial);
   jawMesh.name = 'jaw-cast';
   scene.add(jawMesh);
 }
+
+/* ================= Automatic tooth detection & naming ================= */
+/* Naming convention: patient's RIGHT appears at the viewer's left (-X).
+   Teeth are numbered from the midline outward (R1, R2, … / L1, L2, …);
+   the FDI code uses upper quadrants (R -> 1x, L -> 2x).                  */
+
+const TOOTH_TYPE_BY_POS = ['Central Incisor', 'Lateral Incisor', 'Canine',
+  '1st Premolar', '2nd Premolar', '1st Molar', '2nd Molar', '3rd Molar'];
+
+function assignToothNames() {
+  const named = toothInfo.filter(t => t.center);        // whole-scan fallback has no per-tooth center
+  if (!named.length) return;
+  const cx = named.reduce((s, t) => s + t.center.x, 0) / named.length;
+  const cy = named.reduce((s, t) => s + t.center.y, 0) / named.length;
+  named.forEach(t => { t.theta = Math.atan2(t.center.x - cx, t.center.y - cy); });
+  for (const side of ['R', 'L']) {
+    const sideTeeth = named.filter(t => (t.theta < 0) === (side === 'R'));
+    sideTeeth.sort((a, b) => Math.abs(a.theta) - Math.abs(b.theta));
+    sideTeeth.forEach((t, rank) => {
+      const pos = Math.min(rank + 1, TOOTH_TYPE_BY_POS.length);
+      t.name = `${side}${rank + 1}`;
+      t.fdi = (side === 'R' ? 10 : 20) + pos;
+      t.type = TOOTH_TYPE_BY_POS[pos - 1];
+    });
+  }
+}
+
+function renderTeethTable() {
+  const tbody = document.getElementById('teethTable');
+  const rows = toothInfo.filter(t => t.name);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-slate-600 py-2">No teeth detected yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows
+    .slice().sort((a, b) => a.center.x - b.center.x)    // patient's right (viewer left) first
+    .map(t => `
+      <tr data-id="${t.id}" class="cursor-pointer border-t border-[#232a38] transition
+          ${selected.has(t.id) ? 'bg-amber-400/10 text-amber-300' : 'hover:bg-[#1c2333]'}">
+        <td class="py-1.5 font-mono font-bold">${t.name}<span class="text-slate-600"> · ${t.fdi}</span></td>
+        <td class="py-1.5">${t.type}</td>
+        <td class="py-1.5 font-mono">${t.dims.w.toFixed(1)}×${t.dims.h.toFixed(1)}</td>
+        <td class="py-1.5 text-center font-bold">${selected.has(t.id) ? '✓' : ''}</td>
+      </tr>`).join('');
+  tbody.querySelectorAll('tr[data-id]').forEach(row =>
+    row.addEventListener('click', () => toggleTooth(Number(row.dataset.id))));
+}
+
+function toggleTooth(id) {
+  if (selected.has(id)) { selected.delete(id); tintTooth(id, ENAMEL_COLOR); }
+  else { selected.add(id); tintTooth(id, PAINT_COLOR); }
+  updateSelectionUI();
+}
+
+let detecting = false;
+const DETECT_COLOR = new THREE.Color(0x38bdf8);
+
+async function runDetection(animate = true) {
+  if (!modelMesh || !toothInfo.length || detecting) return;
+  if (toothInfo.length === 1 && toothInfo[0].uploaded) {
+    renderTeethTable();
+    setStatus('⚠ Scan loaded as a single region — no separable teeth found.');
+    return;
+  }
+  detecting = true;
+  assignToothNames();
+  if (animate) {
+    const sweep = toothInfo.filter(t => t.name).sort((a, b) => a.center.x - b.center.x);
+    for (const info of sweep) {
+      tintTooth(info.id, DETECT_COLOR);
+      setStatus(`Detecting… ${info.name} — ${info.type}`);
+      await new Promise(r => setTimeout(r, 110));
+      tintTooth(info.id, selected.has(info.id) ? PAINT_COLOR : ENAMEL_COLOR);
+    }
+  }
+  renderTeethTable();
+  setStatus(`✅ Detected ${toothInfo.filter(t => t.name).length} teeth — see the TEETH tab.`);
+  detecting = false;
+}
+
+document.getElementById('btnDetect').addEventListener('click', async () => {
+  // uploaded whole scans get re-segmented on the backend; local arches re-name
+  if (toothInfo.length === 1 && toothInfo[0].uploaded && lastUploadedGeometry) {
+    await segmentUploadedScan(lastUploadedGeometry, 'scan');
+    return;
+  }
+  runDetection(true);
+});
+document.getElementById('btnSelectAll').addEventListener('click', () => {
+  for (const t of toothInfo.filter(t => t.name || t.uploaded)) {
+    if (!selected.has(t.id)) { selected.add(t.id); tintTooth(t.id, PAINT_COLOR); }
+  }
+  updateSelectionUI();
+});
+document.getElementById('btnClearSel').addEventListener('click', () => {
+  for (const id of [...selected]) { selected.delete(id); tintTooth(id, ENAMEL_COLOR); }
+  updateSelectionUI();
+});
 
 function buildProceduralArch() {
   clearModel();
@@ -540,6 +680,7 @@ function buildProceduralArch() {
 function clearModel() {
   if (modelMesh) { scene.remove(modelMesh); modelMesh.geometry.dispose(); modelMesh = null; }
   if (jawMesh) { scene.remove(jawMesh); jawMesh.geometry.dispose(); jawMesh = null; }
+  lastUploadedGeometry = null;
   toothInfo = [];
   faceToTooth = null;
   selected.clear();
@@ -552,46 +693,153 @@ function clearModel() {
 
 /* ============================ STL upload ============================ */
 
+let lastUploadedGeometry = null;             // kept so "Detect teeth" can re-segment
+
+function geometryToArrays(geometry) {
+  const pos = geometry.attributes.position;
+  const index = geometry.index;
+  const vertices = new Array(pos.count);
+  for (let i = 0; i < pos.count; i++)
+    vertices[i] = [+pos.getX(i).toFixed(3), +pos.getY(i).toFixed(3), +pos.getZ(i).toFixed(3)];
+  const faces = new Array(index.count / 3);
+  for (let t = 0; t < faces.length; t++)
+    faces[t] = [index.getX(t * 3), index.getX(t * 3 + 1), index.getX(t * 3 + 2)];
+  return { vertices, faces };
+}
+
+/* Fill per-tooth placement metadata (center / outward / dims / z-range)
+   from the vertex range of each entry in toothInfo. */
+function computeRangeMeta(geometry) {
+  const pos = geometry.attributes.position;
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  for (const info of toothInfo) {
+    box.makeEmpty();
+    for (let i = info.vStart; i < info.vStart + info.vCount; i++)
+      box.expandByPoint(v.fromBufferAttribute(pos, i));
+    info.center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    info.zTop = box.max.z; info.zBottom = box.min.z;
+    info.size = size;
+  }
+  const cx = toothInfo.reduce((s, t) => s + t.center.x, 0) / toothInfo.length;
+  const cy = toothInfo.reduce((s, t) => s + t.center.y, 0) / toothInfo.length;
+  for (const info of toothInfo) {
+    info.outward = new THREE.Vector3(info.center.x - cx, info.center.y - cy, 0).normalize();
+    if (info.outward.lengthSq() < 0.5) info.outward = new THREE.Vector3(0, 1, 0);
+    const tangent = new THREE.Vector3(-info.outward.y, info.outward.x, 0);
+    info.dims = {
+      w: Math.abs(info.size.x * tangent.x) + Math.abs(info.size.y * tangent.y),
+      d: Math.abs(info.size.x * info.outward.x) + Math.abs(info.size.y * info.outward.y),
+      h: info.size.z,
+    };
+  }
+}
+
+/* Backend segmentation: split the scan into named teeth + rest-of-jaw. */
+async function segmentUploadedScan(geometry, label) {
+  document.getElementById('loading').classList.remove('hidden');
+  setStatus(`Detecting teeth in ${label}…`);
+  try {
+    const res = await fetch('/api/segment-teeth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geometryToArrays(geometry)),
+    });
+    const data = res.ok ? await res.json() : { teeth: [] };
+    if (data.teeth.length >= 2) {
+      clearModel();
+      lastUploadedGeometry = geometry;
+      const teethGeo = new THREE.BufferGeometry();
+      teethGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.vertices.flat(), 3));
+      teethGeo.setIndex(data.faces.flat());
+      teethGeo.computeVertexNormals();
+      toothInfo = data.teeth.map((t, id) => ({
+        id, name: t.name, fdi: t.fdi, type: t.type,
+        vStart: t.vertex_start, vCount: t.vertex_count,
+        fStart: t.face_start, fCount: t.face_count,
+      }));
+      computeRangeMeta(teethGeo);
+      assembleMergedModel(teethGeo);
+      if (data.rest_faces.length) {
+        const restGeo = new THREE.BufferGeometry();
+        restGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.rest_vertices.flat(), 3));
+        restGeo.setIndex(data.rest_faces.flat());
+        restGeo.computeVertexNormals();
+        jawMesh = new THREE.Mesh(restGeo, castMaterial);
+        scene.add(jawMesh);
+      }
+      frameObject(modelMesh);
+      renderTeethTable();
+      setStatus(`✅ Auto-detected ${data.teeth.length} teeth in ${label} — see the TEETH tab.`);
+      runDetection(true);
+      return true;
+    }
+    setStatus(`⚠ ${data.detail || 'No separable teeth found'} — scan loaded as one region.`);
+    return false;
+  } catch (err) {
+    setStatus(`⚠ Segmentation failed (${err.message}) — scan loaded as one region.`);
+    return false;
+  } finally {
+    document.getElementById('loading').classList.add('hidden');
+  }
+}
+
+function loadWholeScan(geometry, name) {
+  clearModel();
+  lastUploadedGeometry = geometry;
+  const nv = geometry.attributes.position.count;
+  const colors = new Float32Array(nv * 3);
+  for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.computeBoundingBox();
+  // the whole scan behaves as one paintable "tooth"
+  toothInfo = [{
+    id: 0, uploaded: true, vStart: 0, vCount: nv,
+    fStart: 0, fCount: geometry.index.count / 3,
+    zTop: geometry.boundingBox.max.z, zBottom: geometry.boundingBox.min.z,
+  }];
+  faceToTooth = null;
+  modelMesh = new THREE.Mesh(geometry, enamelMaterial);
+  scene.add(modelMesh);
+  frameObject(modelMesh);
+  renderTeethTable();
+}
+
 document.getElementById('stlUpload').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const buffer = await file.arrayBuffer();
+  let geometry;
   try {
-    let geometry = new STLLoader().parse(buffer);
-    geometry.deleteAttribute('normal');
-    geometry = BufferGeometryUtils.mergeVertices(geometry, 1e-4);
-    geometry.computeVertexNormals();
+    geometry = prepareStl(buffer);
     geometry.center();
-    clearModel();
-    const nv = geometry.attributes.position.count;
-    const colors = new Float32Array(nv * 3);
-    for (let i = 0; i < nv; i++) colors.set([ENAMEL_COLOR.r, ENAMEL_COLOR.g, ENAMEL_COLOR.b], i * 3);
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.computeBoundingBox();
-    const nf = geometry.index ? geometry.index.count / 3 : nv / 3;
-    // the whole scan behaves as one paintable "tooth"
-    toothInfo = [{
-      id: 0, uploaded: true, vStart: 0, vCount: nv, fStart: 0, fCount: nf,
-      zTop: geometry.boundingBox.max.z, zBottom: geometry.boundingBox.min.z,
-    }];
-    faceToTooth = null;
-    modelMesh = new THREE.Mesh(geometry, enamelMaterial);
-    scene.add(modelMesh);
-    frameObject(modelMesh);
-    setStatus(`Loaded ${file.name} — paint it to select.`);
   } catch {
     setStatus('⚠ Could not parse that STL file.');
+    e.target.value = '';
+    return;
   }
+  const segmented = await segmentUploadedScan(geometry, file.name);
+  if (!segmented) loadWholeScan(geometry, file.name);
   e.target.value = '';
 });
 async function loadDefaultArch() {
   try {
+    setStatus('Loading anatomical models…');
     await loadRealisticArch();
-    setStatus('Realistic dental cast loaded (models: github.com/iiitl/molars, MIT).');
-  } catch {
-    buildProceduralArch();                   // offline / models missing
-    setStatus('Procedural demo arch loaded (realistic models unavailable).');
+    setStatus('Realistic dental cast loaded — running tooth detection…');
+  } catch (err) {
+    console.error('realistic arch failed:', err);
+    try {
+      buildProceduralArch();                 // offline / models missing
+      setStatus(`⚠ Models unavailable (${err.message || err}) — procedural arch loaded.`);
+    } catch (err2) {
+      console.error('procedural arch failed:', err2);
+      setStatus(`⚠ Could not build any dental model: ${err2.message || err2}`);
+      return;
+    }
   }
+  runDetection(true);                        // automatic detection on load
 }
 
 document.getElementById('btnResetArch').addEventListener('click', async () => {
@@ -667,6 +915,7 @@ function paintAt(e, add) {
 
 function updateSelectionUI() {
   document.getElementById('selCount').textContent = selected.size;
+  renderTeethTable();
 }
 
 canvas.addEventListener('pointerdown', (e) => {

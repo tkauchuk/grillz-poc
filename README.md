@@ -33,7 +33,15 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
    model files are unavailable the app falls back to a procedural arch built
    from deformed superellipsoids (trapezoidal incisors, pointed canines,
    cusped premolars/molars). You can also upload your own STL scan.
-2. **Paint** the target teeth with the brush tool (yellow highlight).
+2. **Automatic tooth detection** runs on load: teeth are identified, swept with
+   a highlight animation, and listed in the TEETH tab as a table with dental
+   names (R1/L1 style + FDI codes like 11/21), detected type, and measured
+   W×H in mm. Clicking a row toggles that tooth in the grill selection.
+   Uploaded STL scans are segmented geometrically on the backend
+   (`POST /api/segment-teeth`: connected components filtered to tooth-sized
+   regions, ordered along the arch, gums/jaw returned as a separate backdrop).
+3. **Paint** the target teeth with the brush tool (yellow highlight) — or just
+   pick them from the table.
 3. Tune **Wall Thickness / Inner Clearance / Edge Margin / Back-Side Thinning /
    Smooth Strength** (0 keeps every cusp of the anatomy, 10 melts the shell
    into a soft jewelry polish).

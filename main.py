@@ -227,6 +227,107 @@ def health() -> dict:
 
 
 # --------------------------------------------------------------------------- #
+#  Automatic tooth detection (geometric segmentation)
+# --------------------------------------------------------------------------- #
+TOOTH_TYPES = ["Central Incisor", "Lateral Incisor", "Canine", "1st Premolar",
+               "2nd Premolar", "1st Molar", "2nd Molar", "3rd Molar"]
+
+
+class SegmentRequest(BaseModel):
+    """Full scan mesh (mm). Assumes the app's axis convention: +Y labial,
+    X across the arch, Z vertical."""
+
+    vertices: List[List[float]]
+    faces: List[List[int]]
+    min_tooth_mm: float = Field(3.0, ge=0.5, le=10.0, description="Smallest bbox extent accepted as a tooth")
+    max_tooth_mm: float = Field(18.0, ge=5.0, le=40.0, description="Largest bbox extent accepted as a tooth")
+
+
+@app.post("/api/segment-teeth")
+def segment_teeth(request: SegmentRequest) -> dict:
+    """
+    Detect individual teeth in a dental scan:
+
+      1. Split the mesh into connected components.
+      2. Keep tooth-sized components (bbox between min/max mm); everything
+         else (gums, jaw base) becomes the non-paintable "rest" mesh.
+      3. Order teeth along the arch by angle around the arch centroid and
+         assign dental names. Patient's RIGHT appears at the viewer's left
+         (-X), so -X teeth get R labels; FDI upper quadrants: R->1x, L->2x.
+
+    Returns the teeth re-packed as one mesh with contiguous per-tooth
+    vertex/face ranges (so the client can paint them individually) plus
+    the leftover geometry.
+    """
+    vertices = np.asarray(request.vertices, dtype=np.float64)
+    faces = np.asarray(request.faces, dtype=np.int64)
+    _validate_input(vertices, faces)
+
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    try:
+        components = mesh.split(only_watertight=False)
+    except Exception as exc:
+        raise HTTPException(422, f"Could not split scan into components: {exc}") from exc
+
+    tooth_like, rest = [], []
+    for comp in components:
+        largest = float(comp.extents.max())
+        if request.min_tooth_mm <= largest <= request.max_tooth_mm and len(comp.faces) >= 40:
+            tooth_like.append(comp)
+        else:
+            rest.append(comp)
+
+    if len(tooth_like) < 2:
+        return {"teeth": [], "vertices": [], "faces": [], "rest_vertices": [], "rest_faces": [],
+                "detail": f"only {len(tooth_like)} tooth-like connected regions found"}
+
+    # order along the arch; angle 0 points labially (+Y) from the centroid
+    centers = np.array([c.bounds.mean(axis=0) for c in tooth_like])
+    centroid = centers.mean(axis=0)
+    theta = np.arctan2(centers[:, 0] - centroid[0], centers[:, 1] - centroid[1])
+    order = np.argsort(theta)
+
+    # dental naming: rank within each side by distance from the midline
+    naming = {}
+    for side, sign in (("R", -1), ("L", 1)):
+        side_idx = [i for i in range(len(tooth_like)) if (theta[i] < 0) == (sign < 0)]
+        side_idx.sort(key=lambda i: abs(theta[i]))
+        for rank, i in enumerate(side_idx, start=1):
+            pos = min(rank, len(TOOTH_TYPES))
+            naming[i] = {"name": f"{side}{rank}",
+                         "fdi": (10 if side == "R" else 20) + pos,
+                         "type": TOOTH_TYPES[pos - 1]}
+
+    teeth_meta, out_vertices, out_faces = [], [], []
+    v_off = f_off = 0
+    for i in order:
+        comp = tooth_like[i]
+        nv, nf = len(comp.vertices), len(comp.faces)
+        teeth_meta.append({**naming[i],
+                           "vertex_start": v_off, "vertex_count": nv,
+                           "face_start": f_off, "face_count": nf})
+        out_vertices.append(comp.vertices)
+        out_faces.append(comp.faces + v_off)
+        v_off += nv
+        f_off += nf
+
+    teeth_vertices = np.round(np.vstack(out_vertices), 4)
+    teeth_faces = np.vstack(out_faces)
+
+    if rest:
+        rest_combined = trimesh.util.concatenate(rest)
+        rest_vertices = np.round(rest_combined.vertices, 4).tolist()
+        rest_faces = rest_combined.faces.tolist()
+    else:
+        rest_vertices, rest_faces = [], []
+
+    log.info("segmented scan: %d teeth, %d rest components", len(tooth_like), len(rest))
+    return {"teeth": teeth_meta,
+            "vertices": teeth_vertices.tolist(), "faces": teeth_faces.tolist(),
+            "rest_vertices": rest_vertices, "rest_faces": rest_faces}
+
+
+# --------------------------------------------------------------------------- #
 #  Frontend hosting (single-service: no CORS needed)
 # --------------------------------------------------------------------------- #
 @app.get("/", include_in_schema=False)
